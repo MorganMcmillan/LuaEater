@@ -370,6 +370,198 @@ function LuaEater.many_till(parser, till)
 end
 
 ---
+-- Character Type Parsers
+---
+
+local digit_char = {}
+local hex_char = {}
+local lower_char = {}
+local upper_char = {}
+local alpha_char = {}
+local alphanumeric_char = { _ = true }
+local punctuation_char = {}
+local space_char = {
+    [" "] = true,
+    ["\t"] = true,
+    ["\v"] = true
+}
+local multispace_char = {
+    [" "] = true,
+    ["\t"] = true,
+    ["\v"] = true,
+    ["\r"] = true,
+    ["\n"] = true
+}
+
+-- Fill character type sets
+
+-- Digits
+for i = 48, 57 do
+    local c = char(i)
+    digit_char[c] = true
+    hex_char[c] = true
+    alphanumeric_char[c] = true
+end
+
+-- Hex digits (lower)
+for i = 97, 102 do
+    hex_char[char(i)] = true
+end
+
+-- Hex digits (upper)
+for i = 65, 70 do
+    hex_char[char(i)] = true
+end
+
+-- Lowercase
+for i = 97, 122 do
+    local c = char(i)
+    lower_char[c] = true
+    alpha_char[c] = true
+    alphanumeric_char[c] = true
+end
+
+-- Uppercase
+for i = 65, 90 do
+    local c = char(i)
+    upper_char[c] = true
+    alpha_char[c] = true
+    alphanumeric_char[c] = true
+end
+
+-- Punctuation
+local punctuation = "`~,<.>/?!@#$%^&*()-+=[{]}\\|;:'\""
+for i = 1, #punctuation do
+    punctuation_char[sub(punctuation, i, i)] = true
+end
+
+function LuaEater.alpha0()
+    return LuaEater.take_while(alpha_char)
+end
+
+function LuaEater.alpha1()
+    return function(input)
+        local input, output = LuaEater.alpha0()(input)
+        if #output == 0 then return false, "Alpha1" end
+        return input, output
+    end
+end
+
+function LuaEater.alphanumeric0()
+    return LuaEater.take_while(alphanumeric_char)
+end
+
+function LuaEater.alphanumeric1()
+    return function(input)
+        local input, output = LuaEater.alphanumeric0()(input)
+        if #output == 0 then return false, "Alphanumeric1" end
+        return input, output
+    end
+end
+function LuaEater.digit0()
+    return LuaEater.take_while(digit_char)
+end
+
+function LuaEater.digit1()
+    return function(input)
+        local input, output = LuaEater.digit0()(input)
+        if #output == 0 then return false, "Digit1" end
+        return input, output
+    end
+end
+
+function bin_digit0()
+    return LuaEater.take_while{ ["0"] = true, ["1"] = true }
+end
+
+function LuaEater.bin_digit1()
+    return function(input)
+        local input, output = LuaEater.bin_digit0()(input)
+        if #output == 0 then return false, "BinDigit1" end
+        return input, output
+    end
+end
+
+function LuaEater.hex_digit0()
+    return LuaEater.take_until(hex_char)
+end
+
+function LuaEater.hex_digit1()
+    return function(input)
+        local input, output = LuaEater.hex_digit0()(input)
+        if #output == 0 then return false, "HexDigit1" end
+        return input, output
+    end
+end
+
+function LuaEater.space0()
+    return LuaEater.take_while(space_char)
+end
+
+function LuaEater.space1()
+    return function(input)
+        local input, output = LuaEater.space0()(input)
+        if #output == 0 then return false, "Space1" end
+        return input, output
+    end
+end
+
+function LuaEater.multispace0()
+    return LuaEater.take_while(multispace_char)
+end
+
+function LuaEater.multispace1()
+    return function(input)
+        local input, output = LuaEater.multispace0()(input)
+        if #output == 0 then return false, "MultiSpace1" end
+        return input, output
+    end
+end
+
+function LuaEater.crlf()
+    return LuaEater.tag"\r\n"
+end
+
+function LuaEater.newline()
+    return LuaEater.tag"\n"
+end
+
+function LuaEater.tab()
+    return LuaEater.tag"\t"
+end
+
+
+function LuaEater.one_of(characters)
+    if type(characters) ~= "table" then
+        local charset = {}
+        for i = 1, #characters do
+            charset[sub(characters, i, i)] = true
+        end
+        characters = charset
+    end
+    return function(input)
+        local ok, char = input:consume(1)
+        if not characters[char] then return false, "OneOf" end
+        return ok, char
+    end
+end
+
+function LuaEater.none_of(characters)
+    if type(characters) ~= "table" then
+        local charset = {}
+        for i = 1, #characters do
+            charset[sub(characters, i, i)] = true
+        end
+        characters = charset
+    end
+    return function(input)
+        local ok, char = input:consume(1)
+        if characters[char] then return false, "NoneOf" end
+        return ok, char
+    end
+end
+
+---
 -- Character Tables
 ---
 
