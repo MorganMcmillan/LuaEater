@@ -141,6 +141,15 @@ function LuaEater.take_until(cond)
     end
 end
 
+--- Thin wrapper around `string.match`. Prepends "^" to ensure matching at the start of the string.
+function LuaEater.match(pattern)
+    return function(input)
+        local start, finish = string.find(input.string, pattern, input.position)
+        if not start then return false, "Match" end
+        return input:consume(finish - start + 1)
+    end
+end
+
 --- Applies every parser in sequence, collecting their results.
 function LuaEater.all(parsers)
     return function(input)
@@ -223,7 +232,7 @@ function LuaEater.pair(first, second)
         if not ok then return false, first_output end
         local ok, second_output = second(ok)
         if not ok then return false, second_output end
-        return ok, first_output, second_output
+        return ok, { first_output, second_output }
     end
 end
 
@@ -236,7 +245,23 @@ function LuaEater.separated_pair(first, sep, second)
         if not ok then return false, sep_result end
         local ok, second_output = second(ok)
         if not ok then return false, second_output end
-        return ok, first_output, second_output
+        return ok, { first_output, second_output }
+    end
+end
+
+--- Applies `parser` many times, separated by `sep`. Stops when `sep` fails. Includes the last element.
+function LuaEater.separated_list(parser, sep)
+    return function(input)
+        local outputs, output = {}
+        while true do
+            input, output = parser(input)
+            if not input then return false, output end
+            outputs[#outputs+1] = output
+            local sep_input = sep(input)
+            if not sep_input then break end
+            input = sep_input
+        end
+        return input, outputs
     end
 end
 
@@ -331,6 +356,19 @@ function LuaEater.many_m_n(parser, min, max)
     end
 end
 
+--- Applies `parser` several times until `till` produces a result. Errors if `parser` errors.
+function LuaEater.many_till(parser, till)
+    return function(input)
+        local outputs, output = {}
+        while not till(input) do
+            input, output = parser(input)
+            if not input then return false, output end
+            outputs[#outputs+1] = output
+        end
+        return input, outputs
+    end
+end
+
 ---
 -- Character Tables
 ---
@@ -344,7 +382,7 @@ function CharTable:new(t)
 end
 
 function CharTable:__call(input)
-    local parser = self[input:get_char(1)]
+    local parser = self[sub(input.string, input.position, input.position)]
     if not parser then return false, "CharTable" end
     return parser(input)
 end
@@ -362,6 +400,7 @@ end
 
 --- Assigns parser to numeric (0-9) ASCII characters
 function CharTable:numeric(parser)
+    parser = parser or LuaEater.digit1()
     for i = 48, 57 do
         self[char(i)] = parser
     end
@@ -396,7 +435,7 @@ end
 
 --- Assigns parser to punctuation ASCII characters
 function CharTable:punctuation(parser)
-    return self:set( "`~,<.>/?!@#$%^&*()-+=[{]}\\|;:'\"", parser)
+    return self:set("`~,<.>/?!@#$%^&*()-+=[{]}\\|;:'\"", parser)
 end
 
 --- Assigns parser to quotation ASCII characters
