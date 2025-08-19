@@ -29,20 +29,30 @@ end
 function LuaEater.tag(tag)
     return function(input)
         local unconsumed, expected_tag = input:consume(#tag)
-        if expected_tag == tag then
-            return unconsumed, expected_tag
+        if expected_tag ~= tag then
+            return false, "Tag"
         end
-        return false, "Tag"
+        return unconsumed, expected_tag
     end
 end
 
 --- Succeeds if the input is empty
 function LuaEater.eof()
     return function(input)
-        if input:left() == 0 then
-            return input
+        if input:left() ~= 0 then
+            return false, "Eof"
         end
-        return false, "Eof"
+        return input
+    end
+end
+
+--- Ensures that a parser consumes all its input.
+function LuaEater.all_consuming(parser)
+    return function(input)
+        local input, output = parser(input)
+        if not input then return false, output end
+        if input:left() ~= 0 then return false, "All Consuming" end
+        return input, output
     end
 end
 
@@ -162,11 +172,9 @@ end
 function LuaEater.peek(parser)
     return function(input)
         local ok, output = parser(input)
-        if ok then
-            -- Don't consume the input
-            return input, output
-        end
-        return false, output
+        if not ok then return false, output end
+        -- Don't consume the input
+        return input, output
     end
 end
 
@@ -174,20 +182,16 @@ end
 function LuaEater.opt(parser)
     return function(input)
         local ok, output = parser(input)
-        if ok then
-            return ok, output
-        end
         -- Instead of erroring, do nothing
-        return input
+        if not ok then return input end
+        return ok, output
     end
 end
 
 --- Returns ok when the parser errors
 function LuaEater.invert(parser)
     return function(input)
-        if parser(input) then
-            return false, "Invert"
-        end
+        if parser(input) then return false, "Invert" end
         return input
     end
 end
@@ -196,10 +200,8 @@ end
 function LuaEater.map(parser, f)
     return function(input)
         local ok, output = parser(input)
-        if ok then
-            return ok, f(output)
-        end
-        return false, output
+        if not ok then return false, output end
+        return ok, f(output)
     end
 end
 
@@ -207,14 +209,10 @@ end
 function LuaEater.map_parser(outer, inner)
     return function(input)
         local ok, output = outer(input)
-        if ok then
-            local inner_ok, inner_output = inner(output)
-            if inner_ok then
-                return ok, inner_output
-            end
-            return false, inner_output
-        end
-        return false, output
+        if not ok then return false, output end
+        ok, output = inner(LuaEater.input(output))
+        if not ok then return false, output end
+        return ok, output
     end
 end
 
@@ -222,25 +220,32 @@ end
 function LuaEater.pair(first, second)
     return function(input)
         local ok, first_output = first(input)
-        if ok then
-            local ok, second_output = second(ok)
-            if ok then
-                return ok, { first_output, second_output }
-            end
-            return false, second_output
-        end
-        return false, first_output
+        if not ok then return false, first_output end
+        local ok, second_output = second(ok)
+        if not ok then return false, second_output end
+        return ok, first_output, second_output
+    end
+end
+
+--- Applies two parsers separated by another parser
+function LuaEater.separated_pair(first, sep, second)
+    return function(input)
+        local ok, first_output = first(input)
+        if not ok then return false, first_output end
+        local ok, sep_result = sep(ok)
+        if not ok then return false, sep_result end
+        local ok, second_output = second(ok)
+        if not ok then return false, second_output end
+        return ok, first_output, second_output
     end
 end
 
 --- Returns only the result of parser, if it is preceded by the other parser. Opposite of `terminated`.
 function LuaEater.preceded(precedent, parser)
     return function(input)
-        local input, result = precedent(input)
-        if input then
-            return parser(input)
-        end
-        return false, result
+        local input, preceded = precedent(input)
+        if not input then return false, preceded end
+        return parser(input)
     end
 end
 
@@ -248,14 +253,10 @@ end
 function LuaEater.terminated(parser, terminator)
     return function(input)
         local input, result = parser(input)
-        if input then
-            local ok, terminated = terminator(input)
-            if ok then
-                return input, result
-            end
-            return false, terminated
-        end
-        return false, result
+        if not input then return false, result end
+        local ok, terminated = terminator(input)
+        if not ok then return false, terminated end
+        return input, result
     end
 end
 
@@ -272,17 +273,67 @@ function LuaEater.delimited(first, second, third)
     end
 end
 
+--- Always fails
 function LuaEater.fail(message)
     return function()
         return false, message
     end
 end
 
+--- Always succeeds
 function LuaEater.success()
     return function(input)
         return input
     end
 end
+
+--- Repeats a parser 0 or more times
+function LuaEater.many0(parser)
+    return function(input)
+        local outputs, output = {}
+        repeat
+            input, output = parser(input)
+            if input then
+                outputs[#outputs+1] = output
+            end
+        until not input
+        return input, outputs
+    end
+end
+
+--- Repeats a parser 1 or more times
+function LuaEater.many1(parser)
+    return function(input)
+        local outputs, output = {}
+        repeat
+            input, output = parser(input)
+            if input then
+                outputs[#outputs+1] = output
+            end
+        until not input
+        if #outputs == 0 then return false, "Many1" end
+        return input, outputs
+    end
+end
+
+function LuaEater.many_m_n(parser, min, max)
+    return function(input)
+        local outputs, output = {}
+        repeat
+            input, output = parser(input)
+            if input then
+                outputs[#outputs+1] = output
+            end
+            if #outputs > max then return false, "ManyMN" end
+        until not input
+        if #outputs < min then return false, "ManyMN" end
+        return input, outputs
+    end
+end
+
+---
+-- Character Tables
+---
 
 local CharTable = {}
 CharTable.__index = CharTable
