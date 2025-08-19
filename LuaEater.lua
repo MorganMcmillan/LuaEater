@@ -1,4 +1,4 @@
-local sub, match = string.sub, string.match
+local char, sub, match = string.char, string.sub, string.match
 
 local LuaEater = {}
 
@@ -282,4 +282,90 @@ function LuaEater.success()
     return function(input)
         return input
     end
+end
+
+local CharTable = {}
+CharTable.__index = CharTable
+LuaEater.CharTable = CharTable
+
+function CharTable:new(t)
+    return setmetatable(t or {}, self)
+end
+
+function CharTable:__call(input)
+    local parser = self[input:get_char(1)]
+    if not parser then return false, "CharTable" end
+    return parser(input)
+end
+
+--- Assigns parser to alphabetic (a-zA-Z) ASCII characters
+function CharTable:alphabetic(parser)
+    return self:lower(parser):upper(parser)
+end
+
+--- Assigns parser to alphanumeric (a-zA-Z0-9_) ASCII characters
+function CharTable:alphanumeric(parser)
+    self["_"] = parser
+    return self:alphabetic(parser):numeric(parser)
+end
+
+--- Assigns parser to numeric (0-9) ASCII characters
+function CharTable:numeric(parser)
+    for i = 48, 57 do
+        self[char(i)] = parser
+    end
+    return self
+end
+
+--- Assigns parser to lowercase (a-z) ASCII characters
+function CharTable:lower(parser)
+    for i = 97, 122 do
+        self[char(i)] = parser
+    end
+    return self
+end
+
+--- Assigns parser to uppercase (A-Z) ASCII characters
+function CharTable:upper(parser)
+    for i = 65, 90 do
+        self[char(i)] = parser
+    end
+    return self
+end
+
+--- Assigns parser to whitespace (\f\n\r\t\v) ASCII characters
+function CharTable:whitespace(parser)
+    self["\r"] = parser
+    self["\n"] = parser
+    self["\t"] = parser
+    self["\v"] = parser
+    self[" "] = parser
+    return self
+end
+
+--- Assigns parser to punctuation ASCII characters
+function CharTable:punctuation(parser)
+    return self:set( "`~,<.>/?!@#$%^&*()-+=[{]}\\|;:'\"", parser)
+end
+
+--- Assigns parser to quotation ASCII characters
+function CharTable:quotation(parser)
+    self["'"] = parser
+    self['"'] = parser
+    self["`"] = parser
+    return self
+end
+
+--- Assigns parser to the null character
+function CharTable:null(parser)
+    self["\0"] = parser
+    return self
+end
+
+--- Assigns parser to the given characters
+function CharTable:set(characters, parser)
+    for i = 1, #characters do
+        self[sub(characters, i, i)] = parser
+    end
+    return self
 end
