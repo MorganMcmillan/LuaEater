@@ -250,7 +250,7 @@ end
 --- Applies `parser` many times, separated by `sep`. Stops when `sep` fails. Includes the last element.
 function LuaEater.separated_list(parser, sep)
     return function(input)
-        local outputs, output = {}
+        local outputs, output = {}, nil
         while true do
             input, output = parser(input)
             if not input then return false, output end
@@ -313,7 +313,7 @@ end
 --- Repeats a parser 0 or more times
 function LuaEater.many0(parser)
     return function(input)
-        local outputs, output = {}
+        local outputs, output = {}, nil
         repeat
             input, output = parser(input)
             if input then
@@ -327,7 +327,7 @@ end
 --- Repeats a parser 1 or more times
 function LuaEater.many1(parser)
     return function(input)
-        local outputs, output = {}
+        local outputs, output = {}, nil
         repeat
             input, output = parser(input)
             if input then
@@ -341,7 +341,7 @@ end
 
 function LuaEater.many_m_n(parser, min, max)
     return function(input)
-        local outputs, output = {}
+        local outputs, output = {}, nil
         repeat
             input, output = parser(input)
             if input then
@@ -357,7 +357,7 @@ end
 --- Applies `parser` several times until `till` produces a result. Errors if `parser` errors.
 function LuaEater.many_till(parser, till)
     return function(input)
-        local outputs, output = {}
+        local outputs, output = {}, nil
         while not till(input) do
             input, output = parser(input)
             if not input then return false, output end
