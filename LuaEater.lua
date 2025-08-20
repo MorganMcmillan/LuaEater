@@ -107,6 +107,44 @@ function LuaEater.take_while(cond)
     end
 end
 
+-- Takes characters while a pattern matches or a predicate returns true
+function LuaEater.take_while_m_n(min, max, cond)
+    -- Regex pattern
+    if type(cond) == "string" then
+        return function(input)
+            local length = 1
+            while match(input:get_char(length), cond) do
+                length = length + 1
+                if length - 1 > max then return false, "TakeWhileMN" end
+            end
+            if length - 1 < min then return false, "TakeWhileMN" end
+            return input:consume(length - 1)
+        end
+    -- Predicate function
+    elseif type(cond) == "function" then
+        return function(input)
+            local length = 1
+            while cond(input:get_char(length)) do
+                length = length + 1
+                if length - 1 > max then return false, "TakeWhileMN" end
+            end
+            if length - 1 < min then return false, "TakeWhileMN" end
+            return input:consume(length - 1)
+        end
+    -- Character set
+    elseif type(cond) == "table" then
+        return function(input)
+            local length = 1
+            while cond[input:get_char(length)] do
+                length = length + 1
+                if length - 1 > max then return false, "TakeWhileMN" end
+            end
+            if length - 1 < min then return false, "TakeWhileMN" end
+            return input:consume(length - 1)
+        end
+    end
+end
+
 -- Takes characters while not a pattern doesn't match or a predicate returns false
 function LuaEater.take_until(cond)
     -- Regex pattern
@@ -339,7 +377,7 @@ function LuaEater.many1(parser)
     end
 end
 
-function LuaEater.many_m_n(parser, min, max)
+function LuaEater.many_m_n(min, max, parser)
     return function(input)
         local outputs, output = {}, nil
         repeat
@@ -522,13 +560,14 @@ end
 
 --- Assigns parser to alphanumeric (a-zA-Z0-9_) ASCII characters
 function CharTable:alphanumeric(parser)
+    parser = parser or LuaEater.alphanumeric0
     self["_"] = parser
     return self:alphabetic(parser):numeric(parser)
 end
 
 --- Assigns parser to numeric (0-9) ASCII characters
 function CharTable:numeric(parser)
-    parser = parser or LuaEater.digit1()
+    parser = parser or LuaEater.digit0
     for i = 48, 57 do
         self[char(i)] = parser
     end
@@ -537,6 +576,7 @@ end
 
 --- Assigns parser to lowercase (a-z) ASCII characters
 function CharTable:lower(parser)
+    parser = parser or LuaEater.alpha0
     for i = 97, 122 do
         self[char(i)] = parser
     end
@@ -545,6 +585,7 @@ end
 
 --- Assigns parser to uppercase (A-Z) ASCII characters
 function CharTable:upper(parser)
+    parser = parser or LuaEater.alpha0
     for i = 65, 90 do
         self[char(i)] = parser
     end
@@ -553,6 +594,7 @@ end
 
 --- Assigns parser to whitespace (\f\n\r\t\v) ASCII characters
 function CharTable:whitespace(parser)
+    parser = parser or LuaEater.multispace0
     self["\r"] = parser
     self["\n"] = parser
     self["\t"] = parser
