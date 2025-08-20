@@ -15,7 +15,7 @@ end
 
 --- Returns how many characters are left to be consumed.
 function input_mt:left()
-    return #self.string - self.position
+    return #self.string - self.position - 1
 end
 
 --- Wraps a string as input. All parser functions take in this input type for efficiency
@@ -37,13 +37,11 @@ function LuaEater.tag(tag)
 end
 
 --- Succeeds if the input is empty
-function LuaEater.eof()
-    return function(input)
-        if input:left() ~= 0 then
-            return false, "Eof"
-        end
-        return input
+function LuaEater.eof(input)
+    if input:left() ~= 0 then
+        return false, "Eof"
     end
+    return input
 end
 
 --- Ensures that a parser consumes all its input.
@@ -435,101 +433,39 @@ for i = 1, #punctuation do
     punctuation_char[sub(punctuation, i, i)] = true
 end
 
-function LuaEater.alpha0()
-    return LuaEater.take_while(alpha_char)
-end
-
-function LuaEater.alpha1()
+--- Takes in a parser consuming 0 or more characters and wraps it in a function consuming 1 or more characters.
+local function make1(parser, err_name)
     return function(input)
-        local input, output = LuaEater.alpha0()(input)
-        if #output == 0 then return false, "Alpha1" end
+        local input, output = parser(input)
+        if #output == 0 then return false, err_name end
         return input, output
     end
 end
 
-function LuaEater.alphanumeric0()
-    return LuaEater.take_while(alphanumeric_char)
-end
+LuaEater.alpha0 = LuaEater.take_while(alpha_char)
+LuaEater.alpha1 = make1(LuaEater.alpha0, "Alpha1")
 
-function LuaEater.alphanumeric1()
-    return function(input)
-        local input, output = LuaEater.alphanumeric0()(input)
-        if #output == 0 then return false, "Alphanumeric1" end
-        return input, output
-    end
-end
-function LuaEater.digit0()
-    return LuaEater.take_while(digit_char)
-end
+LuaEater.alphanumeric0 = LuaEater.take_while(alphanumeric_char)
+LuaEater.alphanumeric1 = make1(LuaEater.alphanumeric0, "Alphanumeric1")
 
-function LuaEater.digit1()
-    return function(input)
-        local input, output = LuaEater.digit0()(input)
-        if #output == 0 then return false, "Digit1" end
-        return input, output
-    end
-end
+LuaEater.digit0 = LuaEater.take_while(digit_char)
+LuaEater.digit1 = make1(LuaEater.digit0, "Digit1")
 
-function bin_digit0()
-    return LuaEater.take_while{ ["0"] = true, ["1"] = true }
-end
+LuaEater.bin_digit0 = LuaEater.take_while{ ["0"] = true, ["1"] = true }
+LuaEater.bin_digit1 = make1(LuaEater.bin_digit0, "BinDigit1")
 
-function LuaEater.bin_digit1()
-    return function(input)
-        local input, output = LuaEater.bin_digit0()(input)
-        if #output == 0 then return false, "BinDigit1" end
-        return input, output
-    end
-end
+LuaEater.hex_digit0 = LuaEater.take_until(hex_char)
+LuaEater.hex_digit1 = make1(LuaEater.hex_digit0, "HexDigit1")
 
-function LuaEater.hex_digit0()
-    return LuaEater.take_until(hex_char)
-end
+LuaEater.space0 = LuaEater.take_while(space_char)
+LuaEater.space1 = make1(LuaEater.space0, "Space1")
 
-function LuaEater.hex_digit1()
-    return function(input)
-        local input, output = LuaEater.hex_digit0()(input)
-        if #output == 0 then return false, "HexDigit1" end
-        return input, output
-    end
-end
+LuaEater.multispace0 = LuaEater.take_while(multispace_char)
+LuaEater.multispace1 = make1(LuaEater.multispace0, "Multispace1")
 
-function LuaEater.space0()
-    return LuaEater.take_while(space_char)
-end
-
-function LuaEater.space1()
-    return function(input)
-        local input, output = LuaEater.space0()(input)
-        if #output == 0 then return false, "Space1" end
-        return input, output
-    end
-end
-
-function LuaEater.multispace0()
-    return LuaEater.take_while(multispace_char)
-end
-
-function LuaEater.multispace1()
-    return function(input)
-        local input, output = LuaEater.multispace0()(input)
-        if #output == 0 then return false, "MultiSpace1" end
-        return input, output
-    end
-end
-
-function LuaEater.crlf()
-    return LuaEater.tag"\r\n"
-end
-
-function LuaEater.newline()
-    return LuaEater.tag"\n"
-end
-
-function LuaEater.tab()
-    return LuaEater.tag"\t"
-end
-
+LuaEater.crlf = LuaEater.tag"\r\n"
+LuaEater.newline = LuaEater.tag"\n"
+LuaEater.tab = LuaEater.tag"\t"
 
 function LuaEater.one_of(characters)
     if type(characters) ~= "table" then
