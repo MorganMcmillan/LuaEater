@@ -3,6 +3,7 @@ local char, sub, match = string.char, string.sub, string.match
 local LuaEater = {}
 
 local input_mt = {}
+input_mt.__index = input_mt
 
 function input_mt:consume(n)
     return LuaEater.input(self.string, self.position + n), sub(self.string, self.position, self.position + n - 1)
@@ -15,7 +16,7 @@ end
 
 --- Returns how many characters are left to be consumed.
 function input_mt:left()
-    return #self.string - self.position - 1
+    return #self.string - self.position + 1
 end
 
 --- Wraps a string as input. All parser functions take in this input type for efficiency
@@ -261,6 +262,15 @@ function LuaEater.map_parser(outer, inner)
     end
 end
 
+--- Maps the ok output of a parser to a specific value.
+function LuaEater.value(parser, value)
+    return function(input)
+        local ok, output = parser(input)
+        if not ok then return false, output end
+        return ok, value
+    end
+end
+
 --- Applies two parsers after each other
 function LuaEater.pair(first, second)
     return function(input)
@@ -405,6 +415,21 @@ function LuaEater.many_till(parser, till)
     end
 end
 
+--- Parses a length and then applies the parser that many times.
+function LuaEater.length_value(length_parser, parser)
+    return function(input)
+        local input, length = length_parser(input)
+        if not input then return false, length end
+        local outputs, output = {}, nil
+        for i = 1, length do
+            input, output = parser(input)
+            if not input then return false, output end
+            outputs[i] = output
+        end
+        return input, outputs
+    end
+end
+
 ---
 -- Character Type Parsers
 ---
@@ -535,6 +560,15 @@ function LuaEater.none_of(characters)
     end
 end
 
+--- Recognizes one character that satisfies a predicate
+function LuaEater.satisfy(predicate)
+    return function(input)
+        local ok, char = input:consume(1)
+        if not predicate(char) then return false, "Satisfy" end
+        return ok, char
+    end
+end
+
 ---
 -- Character Tables
 ---
@@ -629,3 +663,5 @@ function CharTable:set(characters, parser)
     end
     return self
 end
+
+return LuaEater
