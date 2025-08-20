@@ -80,31 +80,17 @@ end
 function LuaEater.take_while(cond)
     -- Regex pattern
     if type(cond) == "string" then
-        return function(input)
-            local length = 1
-            while match(input:get_char(length), cond) do
-                length = length + 1
-            end
-            return input:consume(length - 1)
-        end
-    -- Predicate function
-    elseif type(cond) == "function" then
-        return function(input)
-            local length = 1
-            while cond(input:get_char(length)) do
-                length = length + 1
-            end
-            return input:consume(length - 1)
-        end
+        cond = function(char) return match(char, cond) end
     -- Character set
     elseif type(cond) == "table" then
-        return function(input)
-            local length = 1
-            while cond[input:get_char(length)] do
-                length = length + 1
-            end
-            return input:consume(length - 1)
+        cond = function(char) return cond[char] end
+    end
+    return function(input)
+        local length = 1
+        while cond(input:get_char(length)) do
+            length = length + 1
         end
+        return input:consume(length - 1)
     end
 end
 
@@ -112,37 +98,19 @@ end
 function LuaEater.take_while_m_n(min, max, cond)
     -- Regex pattern
     if type(cond) == "string" then
-        return function(input)
-            local length = 1
-            while match(input:get_char(length), cond) do
-                length = length + 1
-                if length - 1 > max then return false, "TakeWhileMN" end
-            end
-            if length - 1 < min then return false, "TakeWhileMN" end
-            return input:consume(length - 1)
-        end
-    -- Predicate function
-    elseif type(cond) == "function" then
-        return function(input)
-            local length = 1
-            while cond(input:get_char(length)) do
-                length = length + 1
-                if length - 1 > max then return false, "TakeWhileMN" end
-            end
-            if length - 1 < min then return false, "TakeWhileMN" end
-            return input:consume(length - 1)
-        end
+        cond = function(char) return match(char, cond) end
     -- Character set
     elseif type(cond) == "table" then
-        return function(input)
-            local length = 1
-            while cond[input:get_char(length)] do
-                length = length + 1
-                if length - 1 > max then return false, "TakeWhileMN" end
-            end
-            if length - 1 < min then return false, "TakeWhileMN" end
-            return input:consume(length - 1)
+        cond = function(char) return cond[char] end
+    end
+    return function(input)
+        local length = 1
+        while cond(input:get_char(length)) do
+            length = length + 1
+            if length - 1 > max then return false, "TakeWhileMN" end
         end
+        if length - 1 < min then return false, "TakeWhileMN" end
+        return input:consume(length - 1)
     end
 end
 
@@ -150,31 +118,17 @@ end
 function LuaEater.take_until(cond)
     -- Regex pattern
     if type(cond) == "string" then
-        return function(input)
-            local length = 1
-            while not match(input:get_char(length), cond) do
-                length = length + 1
-            end
-            return input:consume(length - 1)
-        end
-    -- Predicate function
-    elseif type(cond) == "function" then
-        return function(input)
-            local length = 1
-            while not cond(input:get_char(length)) do
-                length = length + 1
-            end
-            return input:consume(length - 1)
-        end
+        cond = function(char) return match(char, cond) end
     -- Character set
     elseif type(cond) == "table" then
-        return function(input)
-            local length = 1
-            while not cond[input:get_char(length)] do
-                length = length + 1
-            end
-            return input:consume(length - 1)
+        cond = function(char) return cond[char] end
+    end
+    return function(input)
+        local length = 1
+        while not cond(input:get_char(length)) do
+            length = length + 1
         end
+        return input:consume(length - 1)
     end
 end
 
