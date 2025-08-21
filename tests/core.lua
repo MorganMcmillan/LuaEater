@@ -94,17 +94,19 @@ x.run{
         local expression = LuaEater.separated_pair(
             number,
             LuaEater.multispace0,
-            LuaEater.maybe(operator))
+            LuaEater.maybe(operator)
+        )
 
         local statement = LuaEater.many0(LuaEater.preceded(LuaEater.multispace0, expression))
 
         local input = "1 + 2 * 3 / 4 - 5"
         local i = LuaEater.input(input)
-        local _, expr = x.assert(LuaEater.recognize(statement)(i))
+        local _, expr, tree = x.assert(LuaEater.recognize(statement)(i))
 
         x.assertEq(expr, input)
-        local _, tree = statement(i)
+
         x.assertDeepEq(tree, {{1, '+'}, {2, '*'}, {3, "/"}, {4, '-'}, {5, nil}})
+
         for i = 1, #tree do
             local expr = tree[i]
             if type(expr) == "number" then

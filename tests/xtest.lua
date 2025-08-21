@@ -117,20 +117,25 @@ end
 ---Asserts the given condition is true, and fails with a message if it is not
 ---@param cond any
 ---@param message? string
+---@param ... any
 ---@return any cond
 ---@return any message
-function xtest.assert(cond, message)
+---@return any ...
+function xtest.assert(cond, message, ...)
   if not cond then fail(message) end
-  return cond, message
+  return cond, message, ...
 end
 
 ---Asserts the given condition is false, and fails with a message if it is not
 ---@param cond any
 ---@param message? string
+---@param ... any
 ---@return any cond
-function xtest.assertNot(cond, message)
+---@return any message
+---@return any ...
+function xtest.assertNot(cond, message, ...)
   if cond then fail(message) end
-  return cond
+  return cond, message, ...
 end
 
 -- Equality assertions

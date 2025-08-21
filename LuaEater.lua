@@ -40,11 +40,11 @@ function LuaEater.tag(tag)
 end
 
 --- Case-insensitive version of `tag`.
-function LuaEater.tag_case_insensitive()
+function LuaEater.tag_case_insensitive(tag)
     return function(input)
         local unconsumed, expected_tag = input:consume(#tag)
         if expected_tag:lower() ~= tag:lower() then
-            return false, "TagNoCase"
+            return false, "tagCaseInsensitive"
         end
         return unconsumed, expected_tag
     end
@@ -240,7 +240,8 @@ function LuaEater.recognize(parser)
         local left = input:left()
         local ok, output = parser(input)
         if not ok then return false, output end
-        return input:consume(left - ok:left())
+        local input, consumed = input:consume(left - ok:left())
+        return input, consumed, output
     end
 end
 
