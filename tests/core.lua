@@ -68,31 +68,50 @@ x.run{
         local i = LuaEater.input("abcd")
         x.assert(LuaEater.all_consuming(LuaEater.many0(LuaEater.one_of("dcba")))(i))
     end,
-    "Expression parser",
+    "Recursive expression parser",
     function ()
         local number = LuaEater.map(LuaEater.digit1, tonumber)
         local operator = LuaEater.one_of("+-*/")
 
-        local i = LuaEater.input("1 + 2 * 3 / 4 - 5")
-        local _, expr = x.assert(LuaEater.all{
-            number,
-            LuaEater.many0(LuaEater.all{
+        local function expression(input)
+            return LuaEater.all{
+                number,
                 LuaEater.preceded(LuaEater.multispace0, operator),
-                LuaEater.preceded(LuaEater.multispace0, number)
-            }),
-            LuaEater.eof
-        }(i))
+                LuaEater.preceded(LuaEater.multispace0, LuaEater.maybe(LuaEater.any{expression, number}))
+            }(input)
+        end
 
-        local first, rest = expr[1], expr[2]
+        local input = "1 + 2 * 3 / 4 - 5"
+        local i = LuaEater.input(input)
+        local _, expr = x.assert(LuaEater.recognize(expression)(i))
 
-        x.assertEq(first, 1)
-        x.assertEq(rest[1][1], '+')
-        x.assertEq(rest[1][2], 2)
-        x.assertEq(rest[2][1], '*')
-        x.assertEq(rest[2][2], 3)
-        x.assertEq(rest[3][1], '/')
-        x.assertEq(rest[3][2], 4)
-        x.assertEq(rest[4][1], '-')
-        x.assertEq(rest[4][2], 5)
+        x.assertEq(expr, input)
+    end,
+    "Iterative expression parser",
+    function ()
+        local number = LuaEater.map(LuaEater.digit1, tonumber)
+        local operator = LuaEater.one_of("+-*/")
+        local expression = LuaEater.separated_pair(
+            number,
+            LuaEater.multispace0,
+            LuaEater.maybe(operator))
+
+        local statement = LuaEater.many0(LuaEater.preceded(LuaEater.multispace0, expression))
+
+        local input = "1 + 2 * 3 / 4 - 5"
+        local i = LuaEater.input(input)
+        local _, expr = x.assert(LuaEater.recognize(statement)(i))
+
+        x.assertEq(expr, input)
+        local _, tree = statement(i)
+        x.assertDeepEq(tree, {{1, '+'}, {2, '*'}, {3, "/"}, {4, '-'}, {5, nil}})
+        for i = 1, #tree do
+            local expr = tree[i]
+            if type(expr) == "number" then
+                print(expr)
+            else
+                print(expr[1], expr[2])
+            end
+        end
     end
 }

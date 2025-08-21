@@ -234,6 +234,16 @@ function LuaEater.verify(parser, predicate)
     end
 end
 
+--- Applies a parser and returns the consumed input instead of the parser's output.
+function LuaEater.recognize(parser)
+    return function(input)
+        local left = input:left()
+        local ok, output = parser(input)
+        if not ok then return false, output end
+        return input:consume(left - ok:left())
+    end
+end
+
 --- Applies a function to the result of a parser
 function LuaEater.map(parser, f)
     return function(input)
