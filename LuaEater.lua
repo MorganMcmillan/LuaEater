@@ -6,7 +6,8 @@ local input_mt = {}
 input_mt.__index = input_mt
 
 function input_mt:consume(n)
-    return LuaEater.input(self.string, self.position + n), sub(self.string, self.position, self.position + n - 1)
+    local string, position = self.string, self.position
+    return LuaEater.input(string, position + n), sub(string, position, position + n - 1)
 end
 
 function input_mt:get_char(i)
@@ -19,7 +20,7 @@ function input_mt:left()
     return #self.string - self.position + 1
 end
 
---- Wraps a string as input. All parser functions take in this input type for efficiency
+--- Wraps a string as input. All parser functions take in this input type.
 function LuaEater.input(input, position)
     return setmetatable({
         string = input,
@@ -27,11 +28,23 @@ function LuaEater.input(input, position)
     }, input_mt)
 end
 
+--- Recognizes a specific series of characters.
 function LuaEater.tag(tag)
     return function(input)
         local unconsumed, expected_tag = input:consume(#tag)
         if expected_tag ~= tag then
             return false, "Tag"
+        end
+        return unconsumed, expected_tag
+    end
+end
+
+--- Case-insensitive version of `tag`.
+function LuaEater.tag_case_insensitive()
+    return function(input)
+        local unconsumed, expected_tag = input:consume(#tag)
+        if expected_tag:lower() ~= tag:lower() then
+            return false, "TagNoCase"
         end
         return unconsumed, expected_tag
     end
@@ -69,7 +82,7 @@ end
 --- Takes n characters from string
 function LuaEater.take(n)
     return function(input)
-        if n < input:left() then
+        if n > input:left() then
             return false, "Take"
         end
         return input:consume(n)
@@ -78,16 +91,21 @@ end
 
 -- Takes characters while a pattern matches or a predicate returns true
 function LuaEater.take_while(cond)
+    local predicate
     -- Regex pattern
     if type(cond) == "string" then
-        cond = function(char) return match(char, cond) end
+        predicate = function(char) return match(char, cond) end
     -- Character set
     elseif type(cond) == "table" then
-        cond = function(char) return cond[char] end
+        predicate = function(char) return cond[char] end
+    -- Predicate function
+    else
+        predicate = cond
     end
+
     return function(input)
         local length = 1
-        while cond(input:get_char(length)) do
+        while predicate(input:get_char(length)) do
             length = length + 1
         end
         return input:consume(length - 1)
@@ -96,16 +114,21 @@ end
 
 -- Takes characters while a pattern matches or a predicate returns true
 function LuaEater.take_while_m_n(min, max, cond)
+    local predicate
     -- Regex pattern
     if type(cond) == "string" then
-        cond = function(char) return match(char, cond) end
+        predicate = function(char) return match(char, cond) end
     -- Character set
     elseif type(cond) == "table" then
-        cond = function(char) return cond[char] end
+        predicate = function(char) return cond[char] end
+    -- Predicate function
+    else
+        predicate = cond
     end
+
     return function(input)
         local length = 1
-        while cond(input:get_char(length)) do
+        while predicate(input:get_char(length)) do
             length = length + 1
             if length - 1 > max then return false, "TakeWhileMN" end
         end
@@ -114,18 +137,23 @@ function LuaEater.take_while_m_n(min, max, cond)
     end
 end
 
--- Takes characters while not a pattern doesn't match or a predicate returns false
+-- Takes characters until a predicate stops matching
 function LuaEater.take_until(cond)
+    local predicate
     -- Regex pattern
     if type(cond) == "string" then
-        cond = function(char) return match(char, cond) end
+        predicate = function(char) return match(char, cond) end
     -- Character set
     elseif type(cond) == "table" then
-        cond = function(char) return cond[char] end
+        predicate = function(char) return cond[char] end
+    -- Predicate function
+    else
+        predicate = cond
     end
+
     return function(input)
         local length = 1
-        while not cond(input:get_char(length)) do
+        while not predicate(input:get_char(length)) do
             length = length + 1
         end
         return input:consume(length - 1)
@@ -179,7 +207,7 @@ function LuaEater.peek(parser)
 end
 
 --- Optionally applies a parser. This function never errors.
-function LuaEater.opt(parser)
+function LuaEater.maybe(parser)
     return function(input)
         local ok, output = parser(input)
         -- Instead of erroring, do nothing
@@ -193,6 +221,16 @@ function LuaEater.invert(parser)
     return function(input)
         if parser(input) then return false, "Invert" end
         return input
+    end
+end
+
+--- Verifies that a parser matches a predicate
+function LuaEater.verify(parser, predicate)
+    return function(input)
+        local ok, output = parser(input)
+        if not ok then return false, output end
+        if not predicate(output) then return false, "Verify" end
+        return ok, output
     end
 end
 
@@ -306,22 +344,21 @@ function LuaEater.fail(message)
 end
 
 --- Always succeeds
-function LuaEater.success()
-    return function(input)
-        return input
-    end
+function LuaEater.success(input)
+    return input
 end
 
 --- Repeats a parser 0 or more times
 function LuaEater.many0(parser)
     return function(input)
-        local outputs, output = {}, nil
+        local outputs = {}
         repeat
-            input, output = parser(input)
-            if input then
+            local ok, output = parser(input)
+            if ok then
                 outputs[#outputs+1] = output
+                input = ok
             end
-        until not input
+        until not ok
         return input, outputs
     end
 end
@@ -329,28 +366,31 @@ end
 --- Repeats a parser 1 or more times
 function LuaEater.many1(parser)
     return function(input)
-        local outputs, output = {}, nil
+        local outputs = {}
         repeat
-            input, output = parser(input)
-            if input then
+            local ok, output = parser(input)
+            if ok then
                 outputs[#outputs+1] = output
+                input = ok
             end
-        until not input
+        until not ok
         if #outputs == 0 then return false, "Many1" end
         return input, outputs
     end
 end
 
+--- Repeats a parser between `min` and `max` times
 function LuaEater.many_m_n(min, max, parser)
     return function(input)
-        local outputs, output = {}, nil
+        local outputs = {}
         repeat
-            input, output = parser(input)
-            if input then
+            local ok, output = parser(input)
+            if ok then
                 outputs[#outputs+1] = output
+                input = ok
             end
             if #outputs > max then return false, "ManyMN" end
-        until not input
+        until not ok
         if #outputs < min then return false, "ManyMN" end
         return input, outputs
     end
@@ -370,9 +410,9 @@ function LuaEater.many_till(parser, till)
 end
 
 --- Parses a length and then applies the parser that many times.
-function LuaEater.length_value(length_parser, parser)
+function LuaEater.length_value(count, parser)
     return function(input)
-        local input, length = length_parser(input)
+        local input, length = count(input)
         if not input then return false, length end
         local outputs, output = {}, nil
         for i = 1, length do
@@ -521,6 +561,11 @@ function LuaEater.satisfy(predicate)
         if not predicate(char) then return false, "Satisfy" end
         return ok, char
     end
+end
+
+--- Returns the remaining input
+function LuaEater.rest(input)
+    return input:consume(input:left())
 end
 
 ---
