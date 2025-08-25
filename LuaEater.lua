@@ -420,7 +420,7 @@ function LuaEater.delimited(first, second, third)
 end
 
 --- Parses a sequence containing escaped characters as a list.
---- Every first element is an unescaped sequence of characters,
+--- Every first element is the unescaped sequence of characters,
 --- every second element is the escape characters,
 --- and every third element is the escaped sequence.
 --- @param normal Parser the normal, unescaped character parser. Called again every time a valid escape sequence is found.
@@ -440,6 +440,7 @@ function LuaEater.escaped_list(normal, control, escapable)
             local ok, escaped_output = escapable(ok)
             if not ok then return false, escaped_output end
             outputs[#outputs+1] = escaped_output
+            input = ok
         end
     end
 end
@@ -450,6 +451,38 @@ end
 --- @param escapable Parser the parser for the valid escape characters. If this parser fails then `escaped` fails.
 --- @return Parser
 function LuaEater.escaped(normal, control, escapable)
+    return LuaEater.map(LuaEater.escaped_list(normal, control, escapable), table.concat)
+end
+
+--- Parses a sequence containing escaped characters as a list, transforming each escape sequence into the result of `escapable`.
+--- Every odd element is the unescaped sequence of characters,
+--- and every even element is the escaped sequence mapped to the parser.
+--- @param normal Parser the normal, unescaped character parser. Called again every time a valid escape sequence is found
+--- @param control Parser the parser for the escape sequence. If this fails then the parser finishes.
+--- @param escapable Parser the parser for the valid escape characters. If this parser fails then `escaped` fails.
+--- @return Parser
+function LuaEater.escaped_transform_list(normal, control, escapable)
+    return function(input)
+        local outputs = {}
+        while true do
+            local ok, normal_output = normal(input)
+            outputs[#outputs+1] = ok and normal_output or ""
+            input = ok or input
+            if not control(input) then return input, outputs end
+            local ok, escaped_output = escapable(ok)
+            if not ok then return false, escaped_output end
+            outputs[#outputs+1] = escaped_output
+            input = ok
+        end
+    end
+end
+
+--- Parses a sequence containing escaped characters as a string, transforming each escape sequence into the result of `escapable`.
+--- @param normal Parser the normal, unescaped character parser. Called again every time a valid escape sequence is found
+--- @param control Parser the parser for the escape sequence. If this fails then the parser finishes.
+--- @param escapable Parser the parser for the valid escape characters. If this parser fails then `escaped` fails.
+--- @return Parser
+function LuaEater.escaped_transform(normal, control, escapable)
     return LuaEater.map(LuaEater.escaped_list(normal, control, escapable), table.concat)
 end
 

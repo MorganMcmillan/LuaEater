@@ -79,5 +79,32 @@ x.run{
 
         local _, list = x.assert(parenthesized_list(i))
         x.assertShallowEq(list, {"foo", "bar", "baz"})
+    end,
+    "Escaped",
+    function ()
+        local i = LuaEater.input("12$abc34def")
+        local i, escaped = LuaEater.escaped(
+            LuaEater.digit1,
+            LuaEater.tag("$"),
+            LuaEater.tag("abc")
+        )(i)
+        local _, def = LuaEater.rest(i)
+        x.assertEq(escaped, "12$abc34")
+        x.assertEq(def, "def")
+    end,
+    "Escaped List",
+    function ()
+        local i = LuaEater.input("hello/r/n/tworld")
+        local _, escaped = LuaEater.escaped_list(
+            LuaEater.alpha1,
+            LuaEater.tag("/"),
+            LuaEater.one_of("ntr")
+        )(i)
+        x.assertShallowEq(escaped, {
+            "hello", "/", "r",
+            "", "/", "n",
+            "", "/", "t",
+            "world"
+        })
     end
 }
