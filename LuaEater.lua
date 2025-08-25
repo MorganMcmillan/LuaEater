@@ -76,7 +76,7 @@ function LuaEater.all_consuming(parser)
     return function(input)
         local input, output = parser(input)
         if not input then return false, output end
-        if input:left() ~= 0 then return false, "All Consuming" end
+        if input:left() ~= 0 then return false, "AllConsuming" end
         return input, output
     end
 end
