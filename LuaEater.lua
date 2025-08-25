@@ -2,6 +2,7 @@ local char, sub, match = string.char, string.sub, string.match
 
 local LuaEater = {}
 
+--- @class Input
 local input_mt = {}
 input_mt.__index = input_mt
 
@@ -21,6 +22,9 @@ function input_mt:left()
 end
 
 --- Wraps a string as input. All parser functions take in this input type.
+--- @param input string
+---@param position? integer
+--- @return Input
 function LuaEater.input(input, position)
     return setmetatable({
         string = input,
@@ -28,7 +32,11 @@ function LuaEater.input(input, position)
     }, input_mt)
 end
 
+--- @alias Parser<T> fun(Input): Input | false, T | string
+
 --- Recognizes a specific series of characters.
+---@param tag string
+---@return Parser
 function LuaEater.tag(tag)
     return function(input)
         local unconsumed, expected_tag = input:consume(#tag)
@@ -40,6 +48,8 @@ function LuaEater.tag(tag)
 end
 
 --- Case-insensitive version of `tag`.
+---@param tag string
+---@return Parser
 function LuaEater.tag_case_insensitive(tag)
     return function(input)
         local unconsumed, expected_tag = input:consume(#tag)
@@ -51,6 +61,7 @@ function LuaEater.tag_case_insensitive(tag)
 end
 
 --- Succeeds if the input is empty
+--- @type Parser
 function LuaEater.eof(input)
     if input:left() ~= 0 then
         return false, "Eof"
@@ -59,6 +70,8 @@ function LuaEater.eof(input)
 end
 
 --- Ensures that a parser consumes all its input.
+---@param parser Parser
+---@return Parser
 function LuaEater.all_consuming(parser)
     return function(input)
         local input, output = parser(input)
@@ -69,6 +82,9 @@ function LuaEater.all_consuming(parser)
 end
 
 --- Conditionally calls a parser
+---@param cond boolean
+---@param parser Parser
+---@return Parser
 function LuaEater.cond(cond, parser)
     if cond then
         return parser
@@ -80,6 +96,8 @@ function LuaEater.cond(cond, parser)
 end
 
 --- Takes n characters from string
+---@param n integer
+---@return Parser
 function LuaEater.take(n)
     return function(input)
         if n > input:left() then
@@ -89,7 +107,9 @@ function LuaEater.take(n)
     end
 end
 
--- Takes characters while a pattern matches or a predicate returns true
+--- Takes characters while a pattern matches or a predicate returns true
+---@param cond string | table<string, true> | fun(string): boolean
+---@return Parser
 function LuaEater.take_while(cond)
     local predicate
     -- Regex pattern
@@ -112,7 +132,9 @@ function LuaEater.take_while(cond)
     end
 end
 
--- Takes characters while a pattern matches or a predicate returns true
+--- Takes characters while a pattern matches or a predicate returns true
+---@param cond string | table<string, true> | fun(string): boolean
+---@return Parser
 function LuaEater.take_while_m_n(min, max, cond)
     local predicate
     -- Regex pattern
@@ -137,7 +159,9 @@ function LuaEater.take_while_m_n(min, max, cond)
     end
 end
 
--- Takes characters until a predicate stops matching
+--- Takes characters until a predicate stops matching
+---@param cond string | table<string, true> | fun(string): boolean
+---@return Parser
 function LuaEater.take_until(cond)
     local predicate
     -- Regex pattern
@@ -161,6 +185,8 @@ function LuaEater.take_until(cond)
 end
 
 --- Thin wrapper around `string.match`. Prepends "^" to ensure matching at the start of the string.
+---@param pattern string
+---@return Parser
 function LuaEater.match(pattern)
     return function(input)
         local start, finish = string.find(input.string, pattern, input.position)
@@ -170,6 +196,8 @@ function LuaEater.match(pattern)
 end
 
 --- Applies every parser in sequence, collecting their results.
+---@param parsers Parser[]
+---@return Parser<string[]>
 function LuaEater.all(parsers)
     return function(input)
         local results = {}
@@ -185,6 +213,8 @@ function LuaEater.all(parsers)
 end
 
 --- Returns the first okay result of the parsers.
+---@param parsers Parser[]
+---@return Parser
 function LuaEater.any(parsers)
     return function(input)
         for i = 1, #parsers do
@@ -197,6 +227,9 @@ function LuaEater.any(parsers)
     end
 end
 
+--- Returns the result of a parser without consuming any input.
+---@param parser Parser
+---@return Parser
 function LuaEater.peek(parser)
     return function(input)
         local ok, output = parser(input)
@@ -207,6 +240,8 @@ function LuaEater.peek(parser)
 end
 
 --- Optionally applies a parser. This function never errors.
+---@param parser Parser
+---@return Parser<any | nil>
 function LuaEater.maybe(parser)
     return function(input)
         local ok, output = parser(input)
@@ -217,6 +252,8 @@ function LuaEater.maybe(parser)
 end
 
 --- Returns ok when the parser errors
+---@param parser Parser
+---@return Parser
 function LuaEater.invert(parser)
     return function(input)
         if parser(input) then return false, "Invert" end
@@ -225,6 +262,9 @@ function LuaEater.invert(parser)
 end
 
 --- Verifies that a parser matches a predicate
+---@param parser Parser
+---@param predicate fun(string): boolean
+---@return Parser
 function LuaEater.verify(parser, predicate)
     return function(input)
         local ok, output = parser(input)
@@ -235,6 +275,8 @@ function LuaEater.verify(parser, predicate)
 end
 
 --- Applies a parser and returns the consumed input instead of the parser's output.
+---@param parser Parser
+---@return Parser
 function LuaEater.recognize(parser)
     return function(input)
         local left = input:left()
@@ -246,6 +288,10 @@ function LuaEater.recognize(parser)
 end
 
 --- Applies a function to the result of a parser
+---@generic T
+---@param parser Parser
+---@param f fun(any): T
+---@return Parser<T>
 function LuaEater.map(parser, f)
     return function(input)
         local ok, output = parser(input)
@@ -255,17 +301,23 @@ function LuaEater.map(parser, f)
 end
 
 --- Applies a parser to the result of another parser
+---@generic T
+---@param outer Parser
+---@param inner Parser<T>
+---@return Parser<T>
 function LuaEater.map_parser(outer, inner)
     return function(input)
         local ok, output = outer(input)
         if not ok then return false, output end
-        ok, output = inner(LuaEater.input(output))
-        if not ok then return false, output end
-        return ok, output
+        return inner(LuaEater.input(output))
     end
 end
 
 --- Maps the ok output of a parser to a specific value.
+---@generic T
+---@param parser Parser
+---@param value T
+---@return Parser<T>
 function LuaEater.value(parser, value)
     return function(input)
         local ok, output = parser(input)
@@ -275,6 +327,9 @@ function LuaEater.value(parser, value)
 end
 
 --- Applies two parsers after each other
+---@param first Parser
+---@param second Parser
+---@return Parser<any[]>
 function LuaEater.pair(first, second)
     return function(input)
         local ok, first_output = first(input)
@@ -285,6 +340,10 @@ function LuaEater.pair(first, second)
     end
 end
 
+---@param first Parser
+---@param sep Parser
+---@param second Parser
+---@return Parser<any[]>
 --- Applies two parsers separated by another parser
 function LuaEater.separated_pair(first, sep, second)
     return function(input)
@@ -299,6 +358,9 @@ function LuaEater.separated_pair(first, sep, second)
 end
 
 --- Applies `parser` many times, separated by `sep`. Stops when `sep` fails. Includes the last element.
+---@param parser Parser
+---@param sep Parser
+---@return Parser<string[]>
 function LuaEater.separated_list(parser, sep)
     return function(input)
         local outputs, output = {}, nil
@@ -315,6 +377,9 @@ function LuaEater.separated_list(parser, sep)
 end
 
 --- Returns only the result of parser, if it is preceded by the other parser. Opposite of `terminated`.
+---@param precedent Parser
+---@param parser Parser
+---@return Parser
 function LuaEater.preceded(precedent, parser)
     return function(input)
         local input, preceded = precedent(input)
@@ -324,6 +389,9 @@ function LuaEater.preceded(precedent, parser)
 end
 
 --- Returns only the result of parser, if it is followed by the terminator. Opposite of `preceded`.
+---@param parser Parser
+---@param terminator Parser
+---@return Parser
 function LuaEater.terminated(parser, terminator)
     return function(input)
         local input, result = parser(input)
@@ -335,6 +403,10 @@ function LuaEater.terminated(parser, terminator)
 end
 
 --- Applies each parser and only returns the output of the second. Useful for pairs of tags such as parenthesis. Can be thought of as a combination of `preceded` and `terminated`.
+---@param first Parser
+---@param second Parser
+---@param third Parser
+---@return Parser
 function LuaEater.delimited(first, second, third)
     return function(input)
         input, first = first(input)
@@ -347,7 +419,43 @@ function LuaEater.delimited(first, second, third)
     end
 end
 
+--- Parses a sequence containing escaped characters as a list.
+--- Every first element is an unescaped sequence of characters,
+--- every second element is the escape characters,
+--- and every third element is the escaped sequence.
+--- @param normal Parser the normal, unescaped character parser. Called again every time a valid escape sequence is found.
+--- @param control Parser the parser for the escape sequence. If this fails then the parser finishes.
+--- @param escapable Parser the parser for the valid escape characters. If this parser fails then `escaped_list` fails.
+--- @return Parser<string[]>
+function LuaEater.escaped_list(normal, control, escapable)
+    return function(input)
+        local outputs = {}
+        while true do
+            local ok, normal_output = normal(input)
+            outputs[#outputs+1] = ok and normal_output or ""
+            input = ok or input
+            local ok, control_output = control(input)
+            if not ok then return input, outputs end
+            outputs[#outputs+1] = control_output
+            local ok, escaped_output = escapable(ok)
+            if not ok then return false, escaped_output end
+            outputs[#outputs+1] = escaped_output
+        end
+    end
+end
+
+--- Parses a sequence containing escaped characters as a string.
+--- @param normal Parser the normal, unescaped character parser. Called again every time a valid escape sequence is found
+--- @param control Parser the parser for the escape sequence. If this fails then the parser finishes.
+--- @param escapable Parser the parser for the valid escape characters. If this parser fails then `escaped` fails.
+--- @return Parser
+function LuaEater.escaped(normal, control, escapable)
+    return LuaEater.map(LuaEater.escaped_list(normal, control, escapable), table.concat)
+end
+
 --- Always fails
+---@param message string
+---@return Parser<false>
 function LuaEater.fail(message)
     return function()
         return false, message
@@ -355,59 +463,59 @@ function LuaEater.fail(message)
 end
 
 --- Always succeeds
+--- @type Parser
 function LuaEater.success(input)
     return input
 end
 
 --- Repeats a parser 0 or more times
+---@param parser Parser
+---@return Parser<string[]>
 function LuaEater.many0(parser)
     return function(input)
         local outputs = {}
-        repeat
+        while true do
             local ok, output = parser(input)
-            if ok then
-                outputs[#outputs+1] = output
-                input = ok
-            end
-        until not ok
+            if not ok then break end
+            outputs[#outputs+1] = output
+            input = ok
+        end
         return input, outputs
     end
 end
 
---- Repeats a parser 1 or more times
-function LuaEater.many1(parser)
+--- Takes in a parser consuming 0 or more characters and wraps it in a function consuming 1 or more characters.
+local function make1(parser, err_name)
     return function(input)
-        local outputs = {}
-        repeat
-            local ok, output = parser(input)
-            if ok then
-                outputs[#outputs+1] = output
-                input = ok
-            end
-        until not ok
-        if #outputs == 0 then return false, "Many1" end
-        return input, outputs
+        local input, output = parser(input)
+        if #output == 0 then return false, err_name end
+        return input, output
     end
 end
+
+--- Repeats a parser 1 or more times
+LuaEater.many1 = make1(LuaEater.many0, "Many1")
 
 --- Repeats a parser between `min` and `max` times
 function LuaEater.many_m_n(min, max, parser)
     return function(input)
         local outputs = {}
-        repeat
+        while true do
             local ok, output = parser(input)
-            if ok then
-                outputs[#outputs+1] = output
-                input = ok
-            end
+            if not ok then break end
+            outputs[#outputs+1] = output
+            input = ok
             if #outputs > max then return false, "ManyMN" end
-        until not ok
+        end
         if #outputs < min then return false, "ManyMN" end
         return input, outputs
     end
 end
 
 --- Applies `parser` several times until `till` produces a result. Errors if `parser` errors.
+---@param parser Parser
+---@param till Parser
+---@return Parser
 function LuaEater.many_till(parser, till)
     return function(input)
         local outputs, output = {}, nil
@@ -421,6 +529,9 @@ function LuaEater.many_till(parser, till)
 end
 
 --- Parses a length and then applies the parser that many times.
+---@param count Parser<integer>
+---@param parser Parser
+---@return Parser<any[]>
 function LuaEater.length_value(count, parser)
     return function(input)
         local input, length = count(input)
@@ -501,15 +612,6 @@ for i = 1, #punctuation do
     punctuation_char[sub(punctuation, i, i)] = true
 end
 
---- Takes in a parser consuming 0 or more characters and wraps it in a function consuming 1 or more characters.
-local function make1(parser, err_name)
-    return function(input)
-        local input, output = parser(input)
-        if #output == 0 then return false, err_name end
-        return input, output
-    end
-end
-
 LuaEater.alpha0 = LuaEater.take_while(alpha_char)
 LuaEater.alpha1 = make1(LuaEater.alpha0, "Alpha1")
 
@@ -521,6 +623,18 @@ LuaEater.digit1 = make1(LuaEater.digit0, "Digit1")
 
 LuaEater.bin_digit0 = LuaEater.take_while{ ["0"] = true, ["1"] = true }
 LuaEater.bin_digit1 = make1(LuaEater.bin_digit0, "BinDigit1")
+
+LuaEater.oct_digit0 = LuaEater.take_while{
+    ["0"] = true,
+    ["1"] = true,
+    ["2"] = true,
+    ["3"] = true,
+    ["4"] = true,
+    ["5"] = true,
+    ["6"] = true,
+    ["7"] = true,
+}
+LuaEater.oct_digit1 = make1(LuaEater.oct_digit0, "OctDigit1")
 
 LuaEater.hex_digit0 = LuaEater.take_until(hex_char)
 LuaEater.hex_digit1 = make1(LuaEater.hex_digit0, "HexDigit1")
