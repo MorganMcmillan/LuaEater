@@ -2,44 +2,18 @@ local char, sub, match = string.char, string.sub, string.match
 
 local LuaEater = {}
 
---- @class Input
-local input_mt = {}
-input_mt.__index = input_mt
-
-function input_mt:consume(n)
-    local string, position = self.string, self.position
-    return LuaEater.input(string, position + n), sub(string, position, position + n - 1)
+local function consume(input, n)
+    return sub(input, n + 1), sub(input, 1, n)
 end
 
-function input_mt:get_char(i)
-    i = self.position + i - 1
-    return sub(self.string, i, i)
-end
-
---- Returns how many characters are left to be consumed.
-function input_mt:left()
-    return #self.string - self.position + 1
-end
-
---- Wraps a string as input. All parser functions take in this input type.
---- @param input string
----@param position? integer
---- @return Input
-function LuaEater.input(input, position)
-    return setmetatable({
-        string = input,
-        position = position or 1
-    }, input_mt)
-end
-
---- @alias Parser<T> fun(Input): Input | false, T | string
+--- @alias Parser<T> fun(string): string | false, T | string
 
 --- Recognizes a specific series of characters.
 ---@param tag string
 ---@return Parser
 function LuaEater.tag(tag)
     return function(input)
-        local unconsumed, expected_tag = input:consume(#tag)
+        local unconsumed, expected_tag = consume(input, #tag)
         if expected_tag ~= tag then
             return false, "Tag"
         end
@@ -52,7 +26,7 @@ end
 ---@return Parser
 function LuaEater.tag_case_insensitive(tag)
     return function(input)
-        local unconsumed, expected_tag = input:consume(#tag)
+        local unconsumed, expected_tag = consume(input, #tag)
         if expected_tag:lower() ~= tag:lower() then
             return false, "tagCaseInsensitive"
         end
@@ -63,7 +37,7 @@ end
 --- Succeeds if the input is empty
 --- @type Parser
 function LuaEater.eof(input)
-    if input:left() ~= 0 then
+    if #input ~= 0 then
         return false, "Eof"
     end
     return input
@@ -76,7 +50,7 @@ function LuaEater.all_consuming(parser)
     return function(input)
         local input, output = parser(input)
         if not input then return false, output end
-        if input:left() ~= 0 then return false, "AllConsuming" end
+        if #input ~= 0 then return false, "AllConsuming" end
         return input, output
     end
 end
@@ -100,10 +74,10 @@ end
 ---@return Parser
 function LuaEater.take(n)
     return function(input)
-        if n > input:left() then
+        if n > #input then
             return false, "Take"
         end
-        return input:consume(n)
+        return consume(input, n)
     end
 end
 
@@ -125,10 +99,10 @@ function LuaEater.take_while(cond)
 
     return function(input)
         local length = 1
-        while predicate(input:get_char(length)) do
+        while predicate(sub(input, length, length)) do
             length = length + 1
         end
-        return input:consume(length - 1)
+        return consume(input, length - 1)
     end
 end
 
@@ -151,11 +125,11 @@ function LuaEater.take_while_m_n(min, max, cond)
     return function(input)
         local length = 1
         for i = 1, max do
-            if not predicate(input:get_char(length)) then break end
+            if not predicate(sub(input, length, length)) then break end
             length = length + 1
         end
         if length - 1 < min then return false, "TakeWhileMN" end
-        return input:consume(length - 1)
+        return consume(input, length - 1)
     end
 end
 
@@ -177,17 +151,17 @@ function LuaEater.take_until(cond)
 
     return function(input)
         local length = 1
-        while not predicate(input:get_char(length)) do
+        while not predicate(sub(input, length, length)) do
             length = length + 1
         end
-        return input:consume(length - 1)
+        return consume(input, length - 1)
     end
 end
 
---- Skips a certain number of characters, without checking for EOF. Thin wrapper around `input:consume`.
+--- Skips a certain number of characters, without checking for EOF. Thin wrapper around `consume`.
 function LuaEater.skip(n)
     return function(input)
-        return input:consume(n)
+        return consume(input, n)
     end
 end
 
@@ -198,7 +172,7 @@ function LuaEater.match(pattern)
     return function(input)
         local start, finish = string.find(input.string, pattern, input.position)
         if not start then return false, "Match" end
-        return input:consume(finish - start + 1)
+        return consume(input, finish - start + 1)
     end
 end
 
@@ -286,10 +260,10 @@ end
 ---@return Parser
 function LuaEater.recognize(parser)
     return function(input)
-        local left = input:left()
+        local left = #input
         local ok, output = parser(input)
         if not ok then return false, output end
-        local input, consumed = input:consume(left - ok:left())
+        local input, consumed = consume(input, left - ok:left())
         return input, consumed, output
     end
 end
@@ -316,7 +290,7 @@ function LuaEater.map_parser(outer, inner)
     return function(input)
         local ok, output = outer(input)
         if not ok then return false, output end
-        return inner(LuaEater.input(output))
+        return inner(output)
     end
 end
 
@@ -421,8 +395,8 @@ function LuaEater.terminated(parser, terminator)
     return function(input)
         local input, result = parser(input)
         if not input then return false, result end
-        local ok, terminated = terminator(input)
-        if not ok then return false, terminated end
+        local input, terminated = terminator(input)
+        if not input then return false, terminated end
         return input, result
     end
 end
@@ -729,7 +703,7 @@ function LuaEater.one_of(characters)
         characters = charset
     end
     return function(input)
-        local ok, char = input:consume(1)
+        local ok, char = consume(input, 1)
         if not characters[char] then return false, "OneOf" end
         return ok, char
     end
@@ -744,7 +718,7 @@ function LuaEater.none_of(characters)
         characters = charset
     end
     return function(input)
-        local ok, char = input:consume(1)
+        local ok, char = consume(input, 1)
         if characters[char] then return false, "NoneOf" end
         return ok, char
     end
@@ -753,7 +727,7 @@ end
 --- Recognizes one character that satisfies a predicate
 function LuaEater.satisfy(predicate)
     return function(input)
-        local ok, char = input:consume(1)
+        local ok, char = consume(input, 1)
         if not predicate(char) then return false, "Satisfy" end
         return ok, char
     end
@@ -761,7 +735,7 @@ end
 
 --- Returns the remaining input
 function LuaEater.rest(input)
-    return input:consume(input:left())
+    return consume(input, #input)
 end
 
 ---

@@ -16,8 +16,7 @@ x.run{
         end
 
         local input = "1 + 2 * 3 / 4 - 5"
-        local i = LuaEater.input(input)
-        local _, expr = x.assert(LuaEater.recognize(expression)(i))
+        local _, expr = x.assert(LuaEater.recognize(expression)(input))
 
         x.assertEq(expr, input)
     end,
@@ -34,8 +33,7 @@ x.run{
         local statement = LuaEater.many0(LuaEater.preceded(LuaEater.multispace0, expression))
 
         local input = "1 + 2 * 3 / 4 - 5"
-        local i = LuaEater.input(input)
-        local _, expr, tree = x.assert(LuaEater.recognize(statement)(i))
+        local _, expr, tree = x.assert(LuaEater.recognize(statement)(input))
 
         x.assertEq(expr, input)
 
