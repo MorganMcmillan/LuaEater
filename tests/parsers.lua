@@ -18,12 +18,13 @@ x.run{
     function ()
         local rest, output = x.assert(LuaEater.rest("abc123"))
         x.assert(LuaEater.eof(rest))
-        print(output, rest:left())
+        print(output, #rest)
     end,
     "Left and Take",
     function ()
         local rest = x.assert(LuaEater.take(6)("abc123"))
         x.assertEq(#rest, 0)
+        x.assert(LuaEater.take(1)("x"))
     end,
     "Take errors when n is larger than input size",
     function ()

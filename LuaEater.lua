@@ -81,6 +81,13 @@ function LuaEater.take(n)
     end
 end
 
+--- Wraps a table as a function.
+local function wrap_table(table)
+    return function(index)
+        return table[index]
+    end
+end
+
 --- Takes characters while a pattern matches or a predicate returns true
 ---@param cond string | table<string, true> | fun(string): boolean
 ---@return Parser
@@ -91,7 +98,7 @@ function LuaEater.take_while(cond)
         predicate = function(char) return match(char, cond) end
     -- Character set
     elseif type(cond) == "table" then
-        predicate = function(char) return cond[char] end
+        predicate = wrap_table(cond)
     -- Predicate function
     else
         predicate = cond
@@ -116,7 +123,7 @@ function LuaEater.take_while_m_n(min, max, cond)
         predicate = function(char) return match(char, cond) end
     -- Character set
     elseif type(cond) == "table" then
-        predicate = function(char) return cond[char] end
+        predicate = wrap_table(cond)
     -- Predicate function
     else
         predicate = cond
@@ -143,7 +150,7 @@ function LuaEater.take_until(cond)
         predicate = function(char) return match(char, cond) end
     -- Character set
     elseif type(cond) == "table" then
-        predicate = function(char) return cond[char] end
+        predicate = wrap_table(cond)
     -- Predicate function
     else
         predicate = cond
@@ -155,13 +162,6 @@ function LuaEater.take_until(cond)
             length = length + 1
         end
         return consume(input, length - 1)
-    end
-end
-
---- Skips a certain number of characters, without checking for EOF. Thin wrapper around `consume`.
-function LuaEater.skip(n)
-    return function(input)
-        return consume(input, n)
     end
 end
 
@@ -263,7 +263,7 @@ function LuaEater.recognize(parser)
         local left = #input
         local ok, output = parser(input)
         if not ok then return false, output end
-        local input, consumed = consume(input, left - ok:left())
+        local input, consumed = consume(input, left - #ok)
         return input, consumed, output
     end
 end
@@ -271,9 +271,12 @@ end
 --- Applies a function to the result of a parser
 ---@generic T
 ---@param parser Parser
----@param f fun(any): T
+---@param f table | fun(string): T
 ---@return Parser<T>
 function LuaEater.map(parser, f)
+    if type(f) == "table" then
+        f = wrap_table(f)
+    end
     return function(input)
         local ok, output = parser(input)
         if not ok then return false, output end
@@ -467,7 +470,8 @@ function LuaEater.escaped_transform_list(normal, control, escapable)
             local ok, normal_output = normal(input)
             outputs[#outputs+1] = ok and normal_output or ""
             input = ok or input
-            if not control(input) then return input, outputs end
+            ok = control(input)
+            if not ok then return input, outputs end
             local ok, escaped_output = escapable(ok)
             if not ok then return false, escaped_output end
             outputs[#outputs+1] = escaped_output
@@ -482,7 +486,7 @@ end
 --- @param escapable Parser the parser for the valid escape characters. If this parser fails then `escaped` fails.
 --- @return Parser
 function LuaEater.escaped_transform(normal, control, escapable)
-    return LuaEater.map(LuaEater.escaped_list(normal, control, escapable), table.concat)
+    return LuaEater.map(LuaEater.escaped_transform_list(normal, control, escapable), table.concat)
 end
 
 --- Always fails
@@ -694,6 +698,8 @@ LuaEater.crlf = LuaEater.tag"\r\n"
 LuaEater.newline = LuaEater.tag"\n"
 LuaEater.tab = LuaEater.tag"\t"
 
+--- Matches a single character against a set or string of characters.
+--- @param characters string | {string: true}
 function LuaEater.one_of(characters)
     if type(characters) ~= "table" then
         local charset = {}
@@ -758,6 +764,7 @@ end
 
 --- Assigns parser to alphabetic (a-zA-Z) ASCII characters
 function CharTable:alphabetic(parser)
+    parser = parser or LuaEater.alpha0
     return self:lower(parser):upper(parser)
 end
 
@@ -808,6 +815,7 @@ end
 
 --- Assigns parser to punctuation ASCII characters
 function CharTable:punctuation(parser)
+    parser = parser or LuaEater.take_while(punctuation_char)
     return self:set("`~,<.>/?!@#$%^&*()-+=[{]}\\|;:'\"", parser)
 end
 

@@ -41,11 +41,7 @@ x.run{
 
         for i = 1, #tree do
             local expr = tree[i]
-            if type(expr) == "number" then
-                print(expr)
-            else
-                print(expr[1], expr[2])
-            end
+            print(expr[1], expr[2])
         end
     end
 }

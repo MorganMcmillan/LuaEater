@@ -48,7 +48,8 @@ x.run{
         }
         local not_comma = LuaEater.any{
             LuaEater.alphanumeric1,
-            LuaEater.value(LuaEater.skip(1), "")
+            LuaEater.value(LuaEater.take(1), ""),
+            LuaEater.eof
         }
         local split_comma = LuaEater.separated_list(not_comma, comma)
         local function parser(input)
@@ -70,6 +71,13 @@ x.run{
 
         print(length_list("4: 1 2 3 4"))
 
-        x.assertShallowEq(second(length_list(i)), {1, 2, 3, 4})
+        x.assertShallowEq(second(length_list("4: 1 2 3 4")), {1, 2, 3, 4})
+    end,
+    "Many Till",
+    function ()
+        local number = LuaEater.map(LuaEater.one_of("0123456789"), tonumber)
+        local numbers_till = LuaEater.many_till(number, LuaEater.tag("abc"))
+        local _, numbers = x.assert(numbers_till("123789abcd"))
+        x.assertShallowEq(numbers, {1, 2, 3, 7, 8, 9})
     end
 }

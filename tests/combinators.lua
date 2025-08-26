@@ -29,7 +29,7 @@ x.run{
         local i, parsed = LuaEater.cond(true, LuaEater.tag("abc"))("abc123")
         x.assertEq(parsed, "abc")
         i, parsed = LuaEater.cond(false, LuaEater.tag("123"))(i)
-        x.assertEq(i:left(), 3)
+        x.assertEq(#i, 3)
         x.assertNil(parsed)
     end,
     "Map Parser",
@@ -52,7 +52,7 @@ x.run{
     "Terminated",
     function ()
         -- Parse a hello world program in C, a language famous for its semicolons.
-        local _, c = LuaEater.terminated(LuaEater.take_until(";"), LuaEater.tag(";"))('printf(); // Ending comment')
+        local _, c = LuaEater.terminated(LuaEater.take_until(";"), LuaEater.tag(";"))('printf("Hello, World!"); // Ending comment')
         x.assertEq(c, 'printf("Hello, World!")')
     end,
     "Delimited and Separated List",
@@ -93,6 +93,56 @@ x.run{
             "hello", "/", "r",
             "", "/", "n",
             "", "/", "t",
+            "world"
+        })
+    end,
+    "Escaped Transform",
+    function ()
+        local string_chars = LuaEater.take_until{
+            ['"'] = true,
+            ['\\'] = true
+        }
+        local escaped_string = LuaEater.delimited(
+            LuaEater.tag('"'),
+            LuaEater.escaped_transform(
+                string_chars,
+                LuaEater.tag("\\"),
+                LuaEater.map(LuaEater.one_of("ntr"), {
+                    n = "\n",
+                    t = "\t",
+                    r = "\r"
+                })
+            ),
+            LuaEater.tag('"')
+        )
+        local rest, escaped = escaped_string('"hello\\r\\n\\tworld"foo bar')
+        x.assertEq(escaped, "hello\r\n\tworld")
+        x.assertEq(rest, "foo bar")
+    end,
+    "Escaped Transform List",
+    function ()
+        local string_chars = LuaEater.take_until{
+            ['"'] = true,
+            ['\\'] = true
+        }
+        local escaped_string = LuaEater.delimited(
+            LuaEater.tag('"'),
+            LuaEater.escaped_transform_list(
+                string_chars,
+                LuaEater.tag("\\"),
+                LuaEater.map(LuaEater.one_of("ntr"), {
+                    n = "\n",
+                    t = "\t",
+                    r = "\r"
+                })
+            ),
+            LuaEater.tag('"')
+        )
+        local _, escaped = escaped_string('"hello\\r\\n\\tworld"foo bar')
+        x.assertShallowEq(escaped, {
+            "hello", "\r",
+            "", "\n",
+            "", "\t",
             "world"
         })
     end
