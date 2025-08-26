@@ -150,9 +150,9 @@ function LuaEater.take_while_m_n(min, max, cond)
 
     return function(input)
         local length = 1
-        while predicate(input:get_char(length)) do
+        for i = 1, max do
+            if not predicate(input:get_char(length)) then break end
             length = length + 1
-            if length - 1 > max then return false, "TakeWhileMN" end
         end
         if length - 1 < min then return false, "TakeWhileMN" end
         return input:consume(length - 1)
@@ -181,6 +181,13 @@ function LuaEater.take_until(cond)
             length = length + 1
         end
         return input:consume(length - 1)
+    end
+end
+
+--- Skips a certain number of characters, without checking for EOF. Thin wrapper around `input:consume`.
+function LuaEater.skip(n)
+    return function(input)
+        return input:consume(n)
     end
 end
 
@@ -323,6 +330,24 @@ function LuaEater.value(parser, value)
         local ok, output = parser(input)
         if not ok then return false, output end
         return ok, value
+    end
+end
+
+--- Maps the output of a parser to either an okay value or an error value, based on whether the parser was successful.
+--- @generic T
+--- @generic E
+--- @param parser Parser
+--- @param ok T
+--- @param err E
+--- @return Parser<T|E>
+function LuaEater.either(parser, ok, err)
+    return function(input)
+        local next_input = parser(input)
+        if next_input then
+            return next_input, ok
+        else
+            return input, err
+        end
     end
 end
 
@@ -501,7 +526,7 @@ function LuaEater.success(input)
     return input
 end
 
---- Repeats a parser 0 or more times
+--- Repeats a parser 0 or more times.
 ---@param parser Parser
 ---@return Parser<string[]>
 function LuaEater.many0(parser)
@@ -517,20 +542,9 @@ function LuaEater.many0(parser)
     end
 end
 
---- Takes in a parser consuming 0 or more characters and wraps it in a function consuming 1 or more characters.
-local function make1(parser, err_name)
-    return function(input)
-        local input, output = parser(input)
-        if #output == 0 then return false, err_name end
-        return input, output
-    end
-end
 
---- Repeats a parser 1 or more times
-LuaEater.many1 = make1(LuaEater.many0, "Many1")
-
---- Repeats a parser between `min` and `max` times
-function LuaEater.many_m_n(min, max, parser)
+--- Repeats a parser 1 or more times.
+function LuaEater.many1(parser)
     return function(input)
         local outputs = {}
         while true do
@@ -538,7 +552,21 @@ function LuaEater.many_m_n(min, max, parser)
             if not ok then break end
             outputs[#outputs+1] = output
             input = ok
-            if #outputs > max then return false, "ManyMN" end
+        end
+        if #outputs == 0 then return false, "Many1" end
+        return input, outputs
+    end
+end
+
+--- Repeats a parser between `min` and `max` times
+function LuaEater.many_m_n(min, max, parser)
+    return function(input)
+        local outputs = {}
+        for i = 1, max do
+            local ok, output = parser(input)
+            if not ok then break end
+            outputs[#outputs+1] = output
+            input = ok
         end
         if #outputs < min then return false, "ManyMN" end
         return input, outputs
@@ -643,6 +671,16 @@ end
 local punctuation = "`~,<.>/?!@#$%^&*()-+=[{]}\\|;:'\""
 for i = 1, #punctuation do
     punctuation_char[sub(punctuation, i, i)] = true
+end
+
+--- Takes in a parser consuming 0 or more characters and wraps it in a function consuming 1 or more characters.
+local function make1(parser, err_name)
+    return function(input)
+        local input, output = parser(input)
+        if not input then return false, output end
+        if #output == 0 then return false, err_name end
+        return input, output
+    end
 end
 
 LuaEater.alpha0 = LuaEater.take_while(alpha_char)
