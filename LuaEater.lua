@@ -275,12 +275,17 @@ end
 ---@return Parser<T>
 function LuaEater.map(parser, f)
     if type(f) == "table" then
-        f = wrap_table(f)
-    end
-    return function(input)
-        local ok, output = parser(input)
-        if not ok then return false, output end
-        return ok, f(output)
+        return function(input)
+            local ok, output = parser(input)
+            if not ok then return false, output end
+            return ok, f[output]
+        end
+    else
+        return function(input)
+            local ok, output = parser(input)
+            if not ok then return false, output end
+            return ok, f(output)
+        end
     end
 end
 
