@@ -34,13 +34,21 @@ x.run{
             return LuaEater.delimited(LuaEater.multispace0, parser, LuaEater.multispace0)
         end
 
-        local function preceded_by_space(parser)
-            return LuaEater.preceded(LuaEater.multispace0, parser)
+        local function preceded_by_space(parser, space_type)
+            return LuaEater.preceded(space_type or LuaEater.multispace0, parser)
+        end
+
+        local function all_preceded_by_space(parsers)
+            local preceded_parsers = {}
+            for i = 1, #parsers do
+                preceded_parsers[i] = preceded_by_space(parsers[i])
+            end
+            return LuaEater.all(preceded_parsers)
         end
         
         --- Makes a table act as a function
-        local function defer(deferred, f)
-            setmetatable(deferred, {__call = function (_, x)
+        local function define(table, f)
+            setmetatable(table, {__call = function (_, x)
                 return f(x)
             end})
         end
@@ -128,11 +136,73 @@ x.run{
             ["\v"] = true
         }
 
-        local block = LuaEater.preceded(lua_whitespace, LuaEater.separated_list(statement, lua_whitespace))
+        local lua_eof = LuaEater.preceded(lua_whitespace, LuaEater.eof)
 
-        local function_definition = LuaEater.all{
+        local prefix_expression = {}
+        
+        local call_operator = LuaEater.preceded(lua_whitespace, LuaEater.any{
+            argument_list,
+            string,
+            table_definition
+        })
+        call_operator = LuaEater.map(call_operator, function(fn)
+            if fn.type == "string" or fn.type == "table" then
+                return {type = "call_operator", parameters = {fn}}
+            else
+                return {type = "call_operator", parameters = fn}
+            end
+        end)
+
+        local function_call = LuaEater.any{
+            -- Function call
+            all_preceded_by_space{
+                prefix_expression,
+                call_operator
+            },
+            -- Method call
+            all_preceded_by_space{
+                prefix_expression,
+                LuaEater.tag":",
+                identifier,
+                call_operator
+            }
+        }
+
+        local lvalue = LuaEater.any{
+            all_preceded_by_space{
+                prefix_expression,
+                LuaEater.tag"[",
+                expression,
+                LuaEater.tag"]"
+            },
+            LuaEater.separated_pair(
+                prefix_expression,
+                surrounded_by_space(LuaEater.tag"."),
+                identifier
+            ),
+            identifier
+        }
+
+        define(prefix_expression, LuaEater.any{
+            LuaEater.delimited(
+                LuaEater.tag"(",
+                expression,
+                LuaEater.tag")"
+            ),
+            function_call,
+            lvalue
+        })
+
+        local return_statement = LuaEater.preceded(keyword["return"], list(expression))
+
+        return_statement = LuaEater.map(return_statement, function (ret)
+            return {type = "return_statement", value = ret}
+        end)
+
+        local block = preceded_by_space(LuaEater.pair(LuaEater.separated_list(statement, lua_whitespace), preceded_by_space(return_statement, lua_whitespace)), lua_whitespace)
+
+        local function_definition = all_preceded_by_space{
             keyword["function"],
-            LuaEater.multispace0,
             parameter_list,
             block,
             keyword["end"]
@@ -178,18 +248,7 @@ x.run{
             LuaEater.tag')'
         )
 
-        local function_call = LuaEater.preceded(lua_whitespace, LuaEater.any{
-            argument_list,
-            string,
-            table_definition
-        })
-        function_call = LuaEater.map(function_call, function(fn)
-            if fn.type == "string" or fn.type == "table" then
-                return {type = "operator", operator = "function_call", parameters = {fn}}
-            else
-                return {type = "operator", operator = "function_call", parameters = fn}
-            end
-        end)
+        -- Statement types
 
         local function binary_operator_token(operator)
             return {type = "binary_operator", value = operator}
@@ -245,21 +304,83 @@ x.run{
 
         local break_statment = keyword["break"]
 
-        local function_statement = LuaEater.all{
+        local function_statement = all_preceded_by_space{
+            LuaEater.maybe(keyword["local"]),
             keyword["function"],
-            surrounded_by_space(identifier),
+            identifier,
             parameter_list,
             block,
             keyword["end"]
         }
 
-        local return_statement = LuaEater.preceded(keyword["return"], LuaEater.separated_list(
-            surrounded_by_space(expression),
-            LuaEater.tag","
-        ))
-        return_statement = LuaEater.map(return_statement, function (ret)
-            return {type = "statement", statement = "return", value = ret}
-        end)
+        local do_block = LuaEater.delimited(
+            preceded_by_space(keyword["do"]),
+            preceded_by_space(block),
+            preceded_by_space(keyword["end"])
+        )
+
+        local while_statement = all_preceded_by_space{
+            keyword["while"],
+            expression,
+            keyword["do"],
+            block,
+            keyword["end"]
+        }
+
+        local repeat_until_statement = all_preceded_by_space{
+            keyword["repeat"],
+            block,
+            keyword["until"],
+            expression
+        }
+
+        local if_statement = all_preceded_by_space{
+            keyword["if"],
+            expression,
+            keyword["then"],
+            block,
+            LuaEater.many0(all_preceded_by_space{
+                keyword["elseif"],
+                expression,
+                keyword["then"],
+                block
+            }),
+            LuaEater.maybe(
+                LuaEater.pair(
+                    keyword["else"],
+                    preceded_by_space(block)
+                )
+            ),
+            keyword["end"]
+        }
+
+        local numeric_for_statement = all_preceded_by_space{
+            keyword["for"],
+            identifier,
+            LuaEater.tag"=",
+            expression,
+            LuaEater.tag",",
+            expression,
+            LuaEater.maybe(
+                LuaEater.preceded(
+                    LuaEater.tag",",
+                    preceded_by_space(expression)
+                )
+            ),
+            keyword["do"],
+            block,
+            keyword["end"]
+        }
+
+        local generic_for_statement = all_preceded_by_space{
+            keyword["for"],
+            list(identifier),
+            keyword["in"],
+            list(expression),
+            keyword["do"],
+            block,
+            keyword["end"]
+        }
 
         local label_statement = LuaEater.delimited(
             LuaEater.tag"::",
@@ -289,16 +410,30 @@ x.run{
             )
         }
 
-        defer(
-            expression,
-            LuaEater.swear_word
-        )
-
-        defer(
+        define(
             statement,
-            LuaEater.TODO
+            LuaEater.any{
+                local_assignment_statement,
+                assignment_statement,
+                break_statment,
+                label_statement,
+                goto_statement,
+                do_block,
+                while_statement,
+                repeat_until_statement,
+                if_statement,
+                numeric_for_statement,
+                generic_for_statement,
+                function_statement,
+            }
         )
 
-        local statement = TODO
+        -- Expression types
+
+        define(
+            expression,
+            LuaEater.any
+        )
+
     end
 }
