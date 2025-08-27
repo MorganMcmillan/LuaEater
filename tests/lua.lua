@@ -429,10 +429,26 @@ x.run{
         )
 
         -- Expression types
+        local binary_expression = all_preceded_by_space{
+            expression,
+            binary_operator,
+            expression
+        }
+
+        local unary_expression = all_preceded_by_space{
+            unary_operator,
+            expression
+        }
 
         define(
             expression,
-            LuaEater.any
+            LuaEater.any{
+                prefix_expression,
+                LuaEater.tag"...",
+                literal,
+                binary_expression,
+                unary_expression
+            }
         )
 
     end
