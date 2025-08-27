@@ -60,8 +60,7 @@ end
 
 local function kvs_to_table(kvs)
     local table = {}
-    for i = 1, #kvs do
-        local kv = kvs[i]
+    for _, kv in ipairs(kvs) do
         table[kv[1]] = kv[2]
     end
     return table
