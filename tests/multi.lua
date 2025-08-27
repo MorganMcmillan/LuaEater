@@ -61,6 +61,17 @@ x.run{
         x.assertShallowEq(parser("x,,z"), {"x", "", "z"})
         x.assertShallowEq(parser(",,"), {"", "", ""})
     end,
+    "List With Values",
+    function ()
+        local boolean = LuaEater.any{
+            LuaEater.value(LuaEater.tag"true", true),
+            LuaEater.value(LuaEater.tag"false", false)
+        }
+        local bool_list = LuaEater.separated_list(boolean, LuaEater.tag",")
+
+        local _, bools = x.assert(bool_list"true,false")
+        x.assertShallowEq(bools, {true, false})
+    end,
     "Length Value",
     function ()
         local number = LuaEater.map(LuaEater.digit1, tonumber)

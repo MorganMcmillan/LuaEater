@@ -242,7 +242,7 @@ function LuaEater.invert(parser)
     end
 end
 
---- Verifies that a parser matches a predicate
+--- Verifies that a parser matches a predicate.
 ---@param parser Parser
 ---@param predicate fun(string): boolean
 ---@return Parser
@@ -251,6 +251,21 @@ function LuaEater.verify(parser, predicate)
         local ok, output = parser(input)
         if not ok then return false, output end
         if not predicate(output) then return false, "Verify" end
+        return ok, output
+    end
+end
+
+--- Verifies that a parser matches a predicate, and returns the result of that predicate.
+---@generic T
+---@param parser Parser
+---@param predicate fun(string): T|nil
+---@return Parser<T>
+function LuaEater.verify_map(parser, predicate)
+    return function(input)
+        local ok, output = parser(input)
+        if not ok then return false, output end
+        output = predicate(output)
+        if not output then return false, "Verify" end
         return ok, output
     end
 end
@@ -364,17 +379,18 @@ function LuaEater.separated_pair(first, sep, second)
     end
 end
 
---- Applies `parser` many times, separated by `sep`. Stops when `sep` fails. Includes the last element.
+--- Applies `parser` many times, separated by `sep`.
 ---@param parser Parser
 ---@param sep Parser
 ---@return Parser<string[]>
 function LuaEater.separated_list(parser, sep)
     return function(input)
-        local outputs, output = {}, nil
+        local outputs = {}
         while true do
-            input, output = parser(input)
-            if not input then return false, output end
+            local ok, output = parser(input)
+            if not ok then break end
             outputs[#outputs+1] = output
+            input = ok
             local sep_input = sep(input)
             if not sep_input then break end
             input = sep_input
@@ -416,13 +432,13 @@ end
 ---@return Parser
 function LuaEater.delimited(first, second, third)
     return function(input)
-        input, first = first(input)
-        if not input then return false, first end
-        input, second = second(input)
-        if not input then return false, second end
-        input, third = third(input)
-        if not input then return false, third end
-        return input, second
+        local input, first_output = first(input)
+        if not input then return false, first_output end
+        local input, second_output = second(input)
+        if not input then return false, second_output end
+        local input, third_output = third(input)
+        if not input then return false, third_output end
+        return input, second_output
     end
 end
 
@@ -430,7 +446,7 @@ end
 --- Every first element is the unescaped sequence of characters,
 --- every second element is the escape characters,
 --- and every third element is the escaped sequence.
---- @param normal Parser the normal, unescaped character parser. Called again every time a valid escape sequence is found.
+--- @param normal Parser the normal, unescaped character parser. It must not accept the escape sequence.
 --- @param control Parser the parser for the escape sequence. If this fails then the parser finishes.
 --- @param escapable Parser the parser for the valid escape characters. If this parser fails then `escaped_list` fails.
 --- @return Parser<string[]>
@@ -453,7 +469,7 @@ function LuaEater.escaped_list(normal, control, escapable)
 end
 
 --- Parses a sequence containing escaped characters as a string.
---- @param normal Parser the normal, unescaped character parser. Called again every time a valid escape sequence is found
+--- @param normal Parser the normal, unescaped character parser. It must not accept the escape sequence.
 --- @param control Parser the parser for the escape sequence. If this fails then the parser finishes.
 --- @param escapable Parser the parser for the valid escape characters. If this parser fails then `escaped` fails.
 --- @return Parser
@@ -464,7 +480,7 @@ end
 --- Parses a sequence containing escaped characters as a list, transforming each escape sequence into the result of `escapable`.
 --- Every odd element is the unescaped sequence of characters,
 --- and every even element is the escaped sequence mapped to the parser.
---- @param normal Parser the normal, unescaped character parser. Called again every time a valid escape sequence is found
+--- @param normal Parser the normal, unescaped character parser. It must not accept the escape sequence.
 --- @param control Parser the parser for the escape sequence. If this fails then the parser finishes.
 --- @param escapable Parser the parser for the valid escape characters. If this parser fails then `escaped` fails.
 --- @return Parser
@@ -486,7 +502,7 @@ function LuaEater.escaped_transform_list(normal, control, escapable)
 end
 
 --- Parses a sequence containing escaped characters as a string, transforming each escape sequence into the result of `escapable`.
---- @param normal Parser the normal, unescaped character parser. Called again every time a valid escape sequence is found
+--- @param normal Parser the normal, unescaped character parser. It must not accept the escape sequence.
 --- @param control Parser the parser for the escape sequence. If this fails then the parser finishes.
 --- @param escapable Parser the parser for the valid escape characters. If this parser fails then `escaped` fails.
 --- @return Parser

@@ -302,7 +302,7 @@ x.run{
             unary_operator_token
         )
 
-        local break_statment = keyword["break"]
+        local break_statement = keyword["break"]
 
         local function_statement = all_preceded_by_space{
             LuaEater.maybe(keyword["local"]),
@@ -415,7 +415,7 @@ x.run{
             LuaEater.any{
                 local_assignment_statement,
                 assignment_statement,
-                break_statment,
+                break_statement,
                 label_statement,
                 goto_statement,
                 do_block,
@@ -425,6 +425,7 @@ x.run{
                 numeric_for_statement,
                 generic_for_statement,
                 function_statement,
+                function_call
             }
         )
 
@@ -450,6 +451,12 @@ x.run{
                 unary_expression
             }
         )
+
+        -- Now for the real test.
+        -- Let's see how it handles parsing hello world as a block
+        local chunk = LuaEater.terminated(block, lua_eof)
+
+        x.assert(chunk('print("hello world")'))
 
     end
 }
