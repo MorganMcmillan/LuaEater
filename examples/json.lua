@@ -69,7 +69,7 @@ end
 local object = LuaEater.map(LuaEater.delimited(
     LuaEater.tag'{',
     LuaEater.separated_list(key_value, LuaEater.preceded(sp, LuaEater.tag',')),
-    LuaEater.tag'}'
+    LuaEater.preceded(sp, LuaEater.tag'}')
 ), kvs_to_table)
 
 function value(input)
@@ -93,7 +93,62 @@ local root = LuaEater.delimited(
     sp
 )
 
-local bool_list = LuaEater.separated_list(boolean, LuaEater.tag",")
-local _, output = root('{"foo": [123, [456], 789, true]}')
+-- Example taken from https://en.wikipedia.org/wiki/JSON
+local _, output = x.assert(root([[{
+  "first_name": "John",
+  "last_name": "Smith",
+  "is_alive": true,
+  "age": 27,
+  "address": {
+    "street_address": "21 2nd Street",
+    "city": "New York",
+    "state": "NY",
+    "postal_code": "10021-3100"
+  },
+  "phone_numbers": [
+    {
+      "type": "home",
+      "number": "212 555-1234"
+    },
+    {
+      "type": "office",
+      "number": "646 555-4567"
+    }
+  ],
+  "children": [
+    "Catherine",
+    "Thomas",
+    "Trevor"
+  ],
+  "spouse": null
+}]]
+))
 
-x.assertDeepEq(output, {foo = {123, {456}, 789, true}})
+x.assertDeepEq(output, {
+    first_name = "John",
+    last_name = "Smith",
+    is_alive = true,
+    age = 27,
+    address = {
+        street_address = "21 2nd Street",
+        city = "New York",
+        state = "NY",
+        postal_code = "10021-3100"
+    },
+    phone_numbers = {
+        {
+            type = "home",
+            number = "212 555-1234"
+        },
+        {
+            type = "office",
+            number = "646 555-4567"
+        }
+    },
+    children = {
+        "Catherine",
+        "Thomas",
+        "Trevor"
+    },
+    spouse = nil
+})

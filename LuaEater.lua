@@ -525,6 +525,19 @@ function LuaEater.success(input)
     return input
 end
 
+--- Converts any parsing error to the specified error.
+--- @param parser Parser
+--- @param error string
+--- @return Parser
+function LuaEater.context(parser, error)
+    return function(input)
+        local ok, output = parser(input)
+        if not ok then return false, error end
+        return ok, output
+    end
+end
+
+
 --- Repeats a parser 0 or more times.
 ---@param parser Parser
 ---@return Parser<string[]>
@@ -719,8 +732,20 @@ LuaEater.crlf = LuaEater.tag"\r\n"
 LuaEater.newline = LuaEater.tag"\n"
 LuaEater.tab = LuaEater.tag"\t"
 
+--- Consumes a single character and checks that it's equal.
+---@param character string
+---@return Parser
+function LuaEater.char(character)
+    return function(input)
+        local input, c = consume(input, 1)
+        if character ~= c then return false, "Char" end
+        return input, c
+    end
+end
+
 --- Matches a single character against a set or string of characters.
 --- @param characters string | {string: true}
+--- @return Parser
 function LuaEater.one_of(characters)
     if type(characters) ~= "table" then
         local charset = {}
@@ -730,9 +755,9 @@ function LuaEater.one_of(characters)
         characters = charset
     end
     return function(input)
-        local ok, char = consume(input, 1)
-        if not characters[char] then return false, "OneOf" end
-        return ok, char
+        local input, c = consume(input, 1)
+        if not characters[c] then return false, "OneOf" end
+        return input, c
     end
 end
 
@@ -745,18 +770,18 @@ function LuaEater.none_of(characters)
         characters = charset
     end
     return function(input)
-        local ok, char = consume(input, 1)
-        if characters[char] then return false, "NoneOf" end
-        return ok, char
+        local input, c = consume(input, 1)
+        if characters[c] then return false, "NoneOf" end
+        return input, c
     end
 end
 
 --- Recognizes one character that satisfies a predicate
 function LuaEater.satisfy(predicate)
     return function(input)
-        local ok, char = consume(input, 1)
-        if not predicate(char) then return false, "Satisfy" end
-        return ok, char
+        local input, c = consume(input, 1)
+        if not predicate(c) then return false, "Satisfy" end
+        return input, c
     end
 end
 
