@@ -11,11 +11,12 @@ local string = LuaEater.delimited(
         LuaEater.take_until{['"'] = true, ["\\"] = true},
         LuaEater.tag'\\',
         LuaEater.map(
-            LuaEater.one_of("ntr"),
+            LuaEater.one_of('ntr"'),
             {
-                n = "\n",
-                t = "\t",
-                r = "\r"
+                n = '\n',
+                t = '\t',
+                r = '\r',
+                ['"'] = '"'
             }
         )
     ),

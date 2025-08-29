@@ -169,10 +169,11 @@ end
 ---@param pattern string
 ---@return Parser
 function LuaEater.match(pattern)
+    pattern = "^"..pattern
     return function(input)
-        local start, finish = string.find(input.string, pattern, input.position)
-        if not start then return false, "Match" end
-        return consume(input, finish - start + 1)
+        local ok, end_position = string.find(input, pattern)
+        if not ok then return false, "Match" end
+        return consume(input, end_position)
     end
 end
 
@@ -803,7 +804,7 @@ function CharTable:new(t)
 end
 
 function CharTable:__call(input)
-    local parser = self[sub(input.string, input.position, input.position)]
+    local parser = self[sub(input, 1, 1)]
     if not parser then return false, "CharTable" end
     return parser(input)
 end
