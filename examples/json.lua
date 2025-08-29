@@ -28,6 +28,7 @@ local boolean = LuaEater.any{
 }
 
 local number = LuaEater.verify_map(LuaEater.recognize(LuaEater.all{
+    LuaEater.maybe(LuaEater.tag"-"),
     LuaEater.digit1,
     LuaEater.maybe(LuaEater.pair(
         LuaEater.tag'.',
@@ -73,17 +74,17 @@ local object = LuaEater.map(LuaEater.delimited(
 ), kvs_to_table)
 
 function value(input)
-    return LuaEater.preceded(sp, LuaEater.any{
+    return LuaEater.context("Value", LuaEater.preceded(sp, LuaEater.any{
         boolean,
         string,
         number,
         object,
         array,
         null
-    })(input)
+    }))(input)
 end
 
-local root = LuaEater.delimited(
+local root = LuaEater.context("Root", LuaEater.delimited(
     sp,
     LuaEater.any{
         object,
@@ -91,7 +92,7 @@ local root = LuaEater.delimited(
         null
     },
     sp
-)
+))
 
 -- Example taken from https://en.wikipedia.org/wiki/JSON
 local _, output = x.assert(root([[{
@@ -152,3 +153,10 @@ x.assertDeepEq(output, {
     },
     spouse = nil
 })
+
+local canada = io.open("examples/canada.json", "r")
+local contents = canada:read("a")
+
+x.assert(root(contents))
+
+canada:close()

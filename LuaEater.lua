@@ -526,10 +526,10 @@ function LuaEater.success(input)
 end
 
 --- Converts any parsing error to the specified error.
---- @param parser Parser
 --- @param error string
+--- @param parser Parser
 --- @return Parser
-function LuaEater.context(parser, error)
+function LuaEater.context(error, parser)
     return function(input)
         local ok, output = parser(input)
         if not ok then return false, error end
