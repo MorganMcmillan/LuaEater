@@ -312,9 +312,11 @@ end
 ---@return Parser<T>
 function LuaEater.map_parser(outer, inner)
     return function(input)
-        local ok, output = outer(input)
+        local input, output = outer(input)
+        if not input then return false, output end
+        local ok, output = inner(output)
         if not ok then return false, output end
-        return inner(output)
+        return input, output
     end
 end
 
