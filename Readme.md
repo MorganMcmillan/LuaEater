@@ -109,75 +109,75 @@ local root = LuaEater.context("Root", LuaEater.delimited(
 
 ## Character Sequence Combinators
 
-| Combinator           | Parameters                                                                                               | Explanation                                                                    |
-| -------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| char                 | c: string                                                                                                | Matches a single character                                                     |
-| tag                  | tag: string                                                                                              | Matches a sequence of characters                                               |
-| tag_case_insensitive | tag: string                                                                                              | Matches a sequence of characters without case sensitivity                      |
-| match                | pattern: string                                                                                          | Thin wrapper around string.match                                               |
-| one_of               | chars: string                                                                                            | Matches a character if it's in the set of characters.                          |
-| none_of              | chars: string                                                                                            | Matches a character if it's not in the set of characters.                      |
-| take                 | n: integer                                                                                               | Matches n characters                                                           |
-| take_while           | cond: function(c: char): boolean \| table{string = true} \| string (pattern)                             | Matches characters while a condition returns true                              |
-| take_while_m_n       | min: integer, max: integer, cond: function(c: char): boolean \| table{string = true} \| string (pattern) | Matches characters between min and max times or while a condition returns true |
-| take_until           | cond: function(c: char): boolean \| table{string = true} \| string (pattern)                             | Matches characters while a condition returns false                             |
-| rest                 |                                                                                                          | Returns the rest of the input                                                  |
-| eof                  |                                                                                                          | Checks that the input has reached its end                                      |
+| Combinator           | Parameters                                                                                               | Explanation                                                                     |
+| -------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| char                 | c: string                                                                                                | Matches a single character.                                                     |
+| tag                  | tag: string                                                                                              | Matches a sequence of characters.                                               |
+| tag_case_insensitive | tag: string                                                                                              | Matches a sequence of characters without case sensitivity.                      |
+| match                | pattern: string                                                                                          | Thin wrapper around string.match.                                               |
+| one_of               | chars: string                                                                                            | Matches a character if it's in the set of characters.                           |
+| none_of              | chars: string                                                                                            | Matches a character if it's not in the set of characters.                       |
+| take                 | n: integer                                                                                               | Matches n characters.                                                           |
+| take_while           | cond: function(c: char): boolean \| table{string = true} \| string (pattern)                             | Matches characters while a condition returns true.                              |
+| take_while_m_n       | min: integer, max: integer, cond: function(c: char): boolean \| table{string = true} \| string (pattern) | Matches characters between min and max times or while a condition returns true. |
+| take_until           | cond: function(c: char): boolean \| table{string = true} \| string (pattern)                             | Matches characters while a condition returns false.                             |
+| rest                 |                                                                                                          | Returns the rest of the input.                                                  |
+| eof                  |                                                                                                          | Checks that the input has reached its end.                                      |
 
 ## Combining Parsers
 
-| Combinator     |     |
-| -------------- | --- |
-| preceded       |     |
-| terminated     |     |
-| delimited      |     |
-| pair           |     |
-| separated_pair |     |
-| any            |     |
-| all            |     |
+| Combinator     | Parameters                                   | Explanation                                                                    |
+| -------------- | -------------------------------------------- | ------------------------------------------------------------------------------ |
+| preceded       | precedent: Parser, parser: Parser            | Runs precedent, then returns the result of parser.                             |
+| terminated     | parser: Parser, terminator: Parser           | Returns the result of parser if it is followed by the terminator.              |
+| delimited      | first: Parser, second: Parser, third: parser | Runs each parser and returns the result of the second. Useful for parenthisis. |
+| pair           | first: Parser, second: Parser                | Returns the result of both parsers.                                            |
+| separated_pair | first: Parser, sep: Parser, second: Parser   | Returns the result of both parsers separated by sep.                           |
+| any            | parsers: {Parser}                            | Returns the result of the first successful parser.                             |
+| all            | parsers: {Parser}                            | Returns the results of each parser in sequence, provided none of them error.   |
 
 ## Changing the Output of Parsers
 
-| Combinator    |                               | Explanation                                                                              |
-| ------------- | ----------------------------- | ---------------------------------------------------------------------------------------- |
-| value         |                               | If a parser succeeds then it returns the specified value                                 |
-| map           |                               | Maps the result of parser to a function                                                  |
-| map_parser    |                               | Maps the result of a parser onto another parser                                          |
-| verify        |                               | Verifies that a parser meets a condition                                                 |
-| verify_map    |                               | Verifies that a parser meets a condition and returns the result of that verification     |
-| cond          | cond: boolean, parser: Parser | Conditionally applies a parser                                                           |
-| maybe         |                               | Optionally applies a parser                                                              |
-| invert        |                               | Returns an error if the parser was ok                                                    |
-| either        |                               | Selects a value based on whether the parser was successful or not                        |
-| peek          |                               | Applies a parser without consuming any input                                             |
-| recognize     |                               | Applies a parser and returns its consumed input as a string, along with its actual value |
-| all_consuming |                               | Ensures that a parser consumes its entire input                                          |
+| Combinator    | Parameters                          | Explanation                                                                               |
+| ------------- | ----------------------------------- | ----------------------------------------------------------------------------------------- |
+| value         | parser: Parser, value: any          | If a parser succeeds then it returns the specified value.                                 |
+| map           | parser: Parser, f: function         | Maps the result of parser to a function.                                                  |
+| map_parser    | outer: Parser, inner: Parser        | Maps the result of a parser onto another parser.                                          |
+| verify        | parser: Parser, predicate: function | Verifies that a parser meets a condition.                                                 |
+| verify_map    | parser: Parser, predicate: function | Verifies that a parser meets a condition and returns the result of that verification.     |
+| cond          | cond: boolean, parser: Parser       | Conditionally applies a parser.                                                           |
+| maybe         | parser: Parser                      | Optionally applies a parser.                                                              |
+| invert        | parser: Parser                      | Returns an error if the parser was ok.                                                    |
+| either        | parser: Parser, ok: any, err: any   | Selects a value based on whether the parser was successful or not.                        |
+| peek          | parser: Parser                      | Applies a parser without consuming any input.                                             |
+| recognize     | parser: Parser                      | Applies a parser and returns its consumed input as a string, along with its actual value. |
+| all_consuming | parser: Parser                      | Ensures that a parser consumes its entire input.                                          |
 
 ## Applying Parsers Multiple Times
 
-| Combinator             |     |
-| ---------------------- | --- |
-| many0                  |     |
-| many1                  |     |
-| many_m_n               |     |
-| many_till              |     |
-| separated_list         |     |
-| escaped                |     |
-| escaped_list           |     |
-| escaped_transform      |     |
-| escaped_transform_list |     |
-| length_value           |     |
+| Combinator             | Parameters                                         | Explanation                                                                                                                                                       |
+| ---------------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| many0                  | parser: Parser                                     | Applies a parser 0 or more times.                                                                                                                                 |
+| many1                  | parser: Parser                                     | Applies a parser 1 or more times.                                                                                                                                 |
+| many_m_n               | min: integer, max: integer, parser: Parser         | Applies a parser between min and max times.                                                                                                                       |
+| many_till              | parser: Parser, till: Parser                       | Applies a parser until till returns ok.                                                                                                                           |
+| separated_list         | parser: Parser, sep: Parser                        | Applies a parser 0 or more times, separated by sep.                                                                                                               |
+| escaped                | normal: Parser, control: Parser, escapable: Parser | Parses a sequence of characters containing escape characters.                                                                                                     |
+| escaped_list           | normal: Parser, control: Parser, escapable: Parser | Parses a sequence of characters containing escape characters, collecting each separated escape sequence into an array.                                            |
+| escaped_transform      | normal: Parser, control: Parser, escapable: Parser | Parses a sequence of characters containing escape characters and maps them onto the result of escapable.                                                          |
+| escaped_transform_list | normal: Parser, control: Parser, escapable: Parser | Parses a sequence of characters containing escape characters and maps them onto the result of escapable, collecting each separated escape sequence into an array. |
+| length_value           | count: Parser, parser: Parser                      | Parses a length using count and then applies parser exactly that many times.                                                                                      |
 
 ## Premade Parsers
 
 | Parser                        | Explanation                                     |
 | ----------------------------- | ----------------------------------------------- |
-| alpha0 / alpha1               |                                                 |
-| alphanumeric0 / alphanumeric1 |                                                 |
-| digit0 / digit1               |                                                 |
-| bin_digit0 / bin_digit1       |                                                 |
-| oct_digit0 / oct_digit1       |                                                 |
-| hex_digit0 / hex_digit1       |                                                 |
+| alpha0 / alpha1               | Parses alphabetic characters a-Z                |
+| alphanumeric0 / alphanumeric1 | Parses alphanumeric characters a-Z 0-9 and _    |
+| digit0 / digit1               | Parses digit characters 0-9                     |
+| bin_digit0 / bin_digit1       | Parses binary characters 0 and 1                |
+| oct_digit0 / oct_digit1       | Parses octal characters 0-7                     |
+| hex_digit0 / hex_digit1       | Parses hexadecimal characters 0-9 a-f A-F       |
 | space0 / space1               | Parses (non-line-ending) whitespace             |
 | multispace0 / multispace1     | Parses whitespace                               |
 | crlf                          | Parses a carriage return and line feed sequence |
